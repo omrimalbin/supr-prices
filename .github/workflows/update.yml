@@ -35,7 +35,6 @@ jobs:
       - name: שאיבת מחירים ובניית האתר
         env:
           NEW_CITY: ${{ github.event.inputs.city }}
-          DIAG: "1"
         run: python build.py
       - name: שמירת רשימת הערים
         run: |

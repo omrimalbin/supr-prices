@@ -200,9 +200,69 @@ def load_stores():
     return stores
 
 
+def _flat(s):
+    """טקסט מנורמל להשוואה: מקפים/גרשיים/סימנים -> רווח."""
+    return " " + re.sub(r"[^\w]+", " ", (s or "").replace("־", " ")).strip() + " "
+
+
+def _blank_city(c):
+    return c in ("", "0", "unknown", "none", "null") or not c
+
+
+def city_code(city):
+    """רוב הרשתות רושמות את העיר כסמל יישוב של הלמ"ס (למשל נס ציונה = 7200).
+    מוצאים את הסמל לפי סניפים שבשם או בכתובת שלהם מופיע שם העיר."""
+    name = _flat(norm_city(city))
+    votes = {}
+    for s in load_stores():
+        if s["city"].isdigit() and not _blank_city(s["city"]) and name in _flat(s["sname"] + " " + s["address"]):
+            votes[s["city"]] = votes.get(s["city"], 0) + 1
+    return max(votes, key=votes.get) if votes else None
+
+
 def city_stores(city):
     c = norm_city(city)
-    return [s for s in load_stores() if s["city"] == c]
+    name = _flat(c)
+    code = city_code(c)
+    out = []
+    for s in load_stores():
+        sc = s["city"].strip().lower()
+        text = _flat(s["sname"] + " " + s["address"])
+        if code and sc == code:
+            out.append(s)                      # סמל יישוב תואם
+        elif sc.isdigit() and not _blank_city(sc):
+            continue                           # סמל של עיר אחרת
+        elif _blank_city(sc):
+            if name in text:
+                out.append(s)                  # עיר לא מולאה – לפי הכתובת/שם הסניף
+        elif name in text or (_flat(s["city"]) == name and "|" not in s["sname"]):
+            out.append(s)                      # עיר כתובה במילים
+    return out
+
+
+def city_names():
+    """שמות הערים לתצוגה: ממירים סמלי יישוב לשמות לפי הסניפים עצמם."""
+    st = load_stores()
+    code_names = {}
+    for s in st:
+        if s["city"].isdigit() and not _blank_city(s["city"]):
+            for part in re.split(r"[,|\-–]", s["address"] + "," + s["sname"]):
+                p = norm_city(part)
+                if p and not any(ch.isdigit() for ch in p) and len(p) <= 20:
+                    code_names.setdefault(s["city"], {}).setdefault(p, 0)
+                    code_names[s["city"]][p] += 1
+    counts = {}
+    for s in st:
+        c = s["city"]
+        if _blank_city(c.lower()):
+            continue
+        if c.isdigit():
+            cands = code_names.get(c)
+            if not cands:
+                continue
+            c = max(cands, key=cands.get)
+        counts[c] = counts.get(c, 0) + 1
+    return counts
 
 
 def price_file_for(folder, store):

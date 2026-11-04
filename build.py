@@ -54,10 +54,7 @@ def main():
             blob = " ".join([s["city"], s["sname"], s["address"]])
             if "ציונ" in blob or "ness" in blob.lower():
                 print("DIAG match", s)
-    all_cities = {}
-    for s in A.load_stores():
-        if s["city"]:
-            all_cities[s["city"]] = all_cities.get(s["city"], 0) + 1
+    all_cities = A.city_names()
 
     if SITE.exists():
         shutil.rmtree(SITE)
