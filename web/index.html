@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6f5c">
+<title>מחירי סופר</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e0d8;--accent:#1f6f5c;--soft:#e3f1ec;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#151513;--card:#1e1e1b;--ink:#ecebe6;--muted:#9b9a93;--line:#33322e;--accent:#5cc3a6;--soft:#1d3a32;--err:#f2b8b5}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:14px 14px 10px;border-bottom:1px solid var(--line)}
+h1{font-size:21px;margin:0 0 8px}
+.row{display:flex;gap:8px;align-items:center}
+select,input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:100%}
+select{width:auto;flex:1}
+.muted{color:var(--muted);font-size:13px}
+main{padding:10px 12px 90px;max-width:700px;margin:0 auto}
+.item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.top{display:flex;justify-content:space-between;gap:10px}
+.name{font-weight:600}.price{font-weight:700;color:var(--accent);font-size:18px;white-space:nowrap}
+.sub{font-size:13px;color:var(--muted);margin-top:2px}
+.bc{font-family:ui-monospace,monospace;unicode-bidi:plaintext}
+.det{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.det div{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
+.det div:first-child{color:var(--accent);font-weight:600}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-top:8px;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 12px;font-size:13px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.more{display:block;width:100%;padding:12px;font:inherit;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.err{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--err)}
+a{color:var(--accent)}
+.fab{position:fixed;bottom:16px;left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+</style></head><body>
+<header>
+  <h1>מחירי סופר</h1>
+  <div class="row"><select id="city"></select></div>
+  <div style="margin-top:8px"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"></div>
+  <div class="chips" id="sorts">
+    <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
+    <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
+  </div>
+  <div class="muted" id="meta" style="margin-top:6px"></div>
+</header>
+<main id="list"><div class="muted">טוען…</div></main>
+<a class="fab" id="refresh" target="_blank" rel="noopener">רענון עכשיו / הוספת עיר</a>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS={get(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const nis=v=>'₪'+Number(v).toFixed(2);
+let meta=null,data=null,sort=LS.get('sort','name'),shown=60;
+
+function ago(t){const m=Math.round((Date.now()/1000-t)/60);return m<1?"עכשיו":m<60?`לפני ${m} דקות`:m<1440?`לפני ${Math.round(m/60)} שעות`:`לפני ${Math.round(m/1440)} ימים`;}
+
+async function init(){
+  meta=await (await fetch('data/cities.json?'+Date.now())).json();
+  if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
+  else $('#refresh').hidden=true;
+  $('#city').innerHTML=meta.cities.map(c=>`<option value="${c.slug}">${esc(c.name)}${c.items?` (${c.with_prices} סניפים)`:''}</option>`).join('');
+  const saved=LS.get('city','');if(meta.cities.some(c=>c.slug===saved))$('#city').value=saved;
+  document.querySelectorAll('#sorts .chip').forEach(ch=>{ch.classList.toggle('on',ch.dataset.s===sort);ch.onclick=()=>{sort=ch.dataset.s;LS.set('sort',sort);document.querySelectorAll('#sorts .chip').forEach(x=>x.classList.toggle('on',x===ch));shown=60;draw();};});
+  await loadCity();
+}
+async function loadCity(){
+  const c=meta.cities.find(x=>x.slug===$('#city').value);LS.set('city',c.slug);
+  $('#meta').textContent=`עודכן ${ago(meta.updated)}`;
+  if(c.error){data=null;$('#list').innerHTML=`<div class="err">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף אותה דרך הכפתור למטה.</span>`:''}</div>`;return;}
+  $('#list').innerHTML='<div class="muted">טוען…</div>';
+  data=await (await fetch(`data/${c.slug}.json?`+Math.floor(meta.updated))).json();
+  for(const it of data.items){const p=it[3];it.min=p[0][1];it.max=p[p.length-1][1];it.n=p.length;}
+  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים · עודכן ${ago(meta.updated)}`;
+  shown=60;draw();
+}
+function filtered(){
+  const q=$('#q').value.trim().toLowerCase();
+  let r=q?data.items.filter(it=>it[1].toLowerCase().includes(q)||it[0].includes(q)||(it[2]||'').toLowerCase().includes(q)):data.items.slice();
+  const f={name:(a,b)=>a[1].localeCompare(b[1],'he'),cheap:(a,b)=>a.min-b.min,gap:(a,b)=>(b.max-b.min)-(a.max-a.min),n:(a,b)=>b.n-a.n}[sort];
+  return r.sort(f);
+}
+function draw(){
+  if(!data)return;
+  const r=filtered();
+  const st=data.stores;
+  $('#list').innerHTML=(r.length?'':'<div class="muted">לא נמצאו מוצרים</div>')+r.slice(0,shown).map((it,i)=>`<div class="item" data-i="${i}">
+    <div class="top"><div><div class="name">${esc(it[1]||'(ללא שם)')}</div>
+    <div class="sub">${it[2]?esc(it[2])+' · ':''}<span class="bc">${esc(it[0])}</span></div>
+    <div class="sub">הכי זול ב${esc(st[it[3][0][0]][0])} – ${esc(st[it[3][0][0]][1])}${it.n>1?` · עד ${nis(it.max)} · ${it.n} סניפים`:''}</div></div>
+    <div class="price">${nis(it.min)}</div></div></div>`).join('')
+    +(r.length>shown?`<button class="more" id="more">הצגת עוד (${(r.length-shown).toLocaleString('he-IL')})</button>`:'');
+  const vis=r.slice(0,shown);
+  document.querySelectorAll('.item').forEach(el=>el.onclick=()=>{
+    const ex=el.querySelector('.det');if(ex){ex.remove();return;}
+    const it=vis[+el.dataset.i];const d=document.createElement('div');d.className='det';
+    d.innerHTML=it[3].map(([s,p])=>`<div><span>${esc(st[s][0])} – ${esc(st[s][1])}</span><span>${nis(p)}</span></div>`).join('');el.appendChild(d);});
+  const m=$('#more');if(m)m.onclick=()=>{shown+=100;draw();};
+}
+$('#city').onchange=loadCity;
+let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
+init().catch(e=>$('#list').innerHTML=`<div class="err">הנתונים עוד לא מוכנים – ההרצה הראשונה לוקחת כחצי שעה. (${esc(e.message)})</div>`);
+</script></body></html>

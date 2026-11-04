@@ -1,0 +1,5 @@
+site/
+dumps/
+__pycache__/
+settings.json
+log.txt
