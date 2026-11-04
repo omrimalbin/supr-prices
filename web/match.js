@@ -1,0 +1,167 @@
+// מנוע התאמה: שורה ברשימת קניות -> המוצר המתאים והזול ביותר בכל סניף.
+// פריט בנתונים: [ברקוד, שם, יצרן, [[סניף, מחיר], ...], גודל, יחידה]   יחידה: g | ml | kg (שקיל) | u | ''
+(function (root) {
+  // מילים שהופכות מוצר לסוג אחר ("חלב שוקולד", "אורז פריך"). לא חלות אם הן מופיעות בשורה עצמה.
+  const EXCLUDE = ("שוקולד שוקו בטעם טעם ממרח רוטב חטיף חטיפי סויה שקדים שקד שיבולת קוקוס משקה מעדן מעדני פודינג קרם " +
+    "עוגה עוגת עוגיות עוגייה גלידה ופל וופל קרקר קרקרים פריכיות פריך פתיתים דגני קורנפלקס מרוכז אבקת אבקה ממתק סוכריות " +
+    "מסטיק ארטיק שייק לתינוקות תמל מטרנה סימילאק לחתול לכלב חתולים כלבים קפה קקאו וניל תות בננה מוקה לאטה קפוצינו מוס " +
+    "דייסה ניחוח בישום סבון שמפו מרכך קרמבו ביסקוויט ריזוטו תבשיל מוכן מוכנה מתובל תערובת מיקס סלט חמוץ חמוצים כבוש " +
+    "פירה קציצות שניצל פשטידה מאפה בורקס פיצה ספריי מרסס תרסיס מגבונים קישוט סירופ ליקר בירה יין וודקה " +
+    "מרוסק מקולפ חתוכ מיובש רסק קצוצ שימור במלח בחומץ ציפס צ'יפס מטוגנ ניוקי בוטנים בוטן שומשום כבושים פתיתי " +
+    "פריכונים בייגלה שקדי ממולא ממולאים צנצנת בצנצנת").split(" ");
+  // מילים קצרות שמחריגות רק בהתאמה מלאה ("נייר טואלט לח", "קפה קר")
+  const EXACT = ["לח", "לחים", "לחות", "קר", "קרה"];
+  const SUF = ["", "ה", "ת", "ות", "ימ", "י", "ית", "יות", "יימ", "ייה", "יה"];   // אחרי נרמול: ם -> מ
+
+  const UNIT_RE = [
+    [/(\d+(?:\.\d+)?)\s*(?:ק"?ג|קילו(?:גרם)?)/, "g", 1000],
+    [/(\d+(?:\.\d+)?)\s*(?:גרם|גר|ג)(?![א-ת])/, "g", 1],
+    [/(\d+(?:\.\d+)?)\s*(?:מ"?ל|מיליליטר)/, "ml", 1],
+    [/(\d+(?:\.\d+)?)\s*(?:ליטר|ל)(?![א-ת])/, "ml", 1000],
+  ];
+
+  let EXCL = null;
+  function norm(s) {
+    return String(s || "").toLowerCase()
+      .replace(/[׳'`"״]/g, "")
+      .replace(/[ךםןףץ]/g, c => ({ "ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ" })[c])
+      .replace(/[^\w֐-׿%.]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  // "חלב x2" / "2 חלב" / "אורז פרסי 1 קג" -> {text, qty, size, unit}
+  function parseLine(line) {
+    let t = String(line || "").trim(), qty = 1, size = 0, unit = "";
+    const raw = t.replace(/[׳'`"״]/g, m => (m === "״" || m === '"') ? '"' : "");
+    for (const [re, u, mul] of UNIT_RE) {
+      const m = raw.match(re);
+      if (m) { size = parseFloat(m[1]) * mul; unit = u; t = raw.replace(m[0], " "); break; }
+    }
+    let m = t.match(/(?:^|\s)[x×*]\s*(\d+)\s*$/i) || t.match(/\s(\d{1,2})\s*$/) || t.match(/^\s*(\d{1,2})\s+(?=\D)/);
+    if (m) { qty = parseInt(m[1], 10) || 1; t = t.replace(m[0], " "); }
+    return { text: norm(t), qty, size, unit };
+  }
+
+  const okRest = r => SUF.includes(r) || /^[\d%.]/.test(r);
+  function stem(t) {
+    for (const e of ["יות", "ייה", "ות", "ימ", "יה", "ה", "ת", "י"])
+      if (t.length - e.length >= 2 && t.endsWith(e)) return t.slice(0, -e.length);
+    return t;
+  }
+  function wordMatches(w, t) {
+    if (!w) return false;
+    if (w === t || (w.startsWith(t) && okRest(w.slice(t.length)))) return true;
+    const b = stem(t);
+    if (b !== t && w.startsWith(b) && okRest(w.slice(b.length))) return true;   // ביצים <-> ביצה, עגבניות <-> עגבנייה
+    if ("הוב".includes(w[0]) && w.length > 2) return wordMatches(w.slice(1), t);  // "החלב"
+    return false;
+  }
+
+  function prep(items) {           // מחשב פעם אחת מילים מנורמלות לכל מוצר
+    if (!EXCL) EXCL = EXCLUDE.map(norm);
+    for (const it of items) if (!it.words) it.words = norm(it[1]).split(" ");
+    return items;
+  }
+
+  // כל המוצרים שמתאימים לשורה (בלי קשר לסניף), מסוננים לסוג הנכון
+  function candidates(items, q) {
+    const toks = q.text.split(" ").filter(Boolean);
+    if (!toks.length) return [];
+    let res = items.filter(it => {
+      const ws = it.words;
+      if (!toks.every(t => ws.some(w => wordMatches(w, t)))) return false;
+      for (const w of ws) {
+        for (const ex of EXCL) if (w.startsWith(ex) && !toks.some(t => t.startsWith(ex))) return false;
+        if (EXACT.includes(w) && !toks.includes(w)) return false;
+      }
+      return true;
+    });
+    // מעדיפים מוצרים ששמם מתחיל במילה הראשונה ("חלב 3%" ולא "קפה עם חלב")
+    const head = res.filter(it => wordMatches(it.words[0], toks[0]) ||
+      (it.words[1] && /^(טרי|טריה|מהדרין|מבחר|יטבתה|תנובה|שטראוס|טרה)$/.test(it.words[0]) && wordMatches(it.words[1], toks[0])));
+    if (head.length) res = head;
+    // מוצרים שקילים (מחיר לק"ג): רק לירקות/פירות/בשר בסיסיים (שם קצר), או כשאין חלופה ארוזה
+    if (res.some(it => it[5] !== "kg")) res = res.filter(it => it[5] !== "kg" || it.words.length <= 4);
+    // משווים באותה יחידת מידה (משקל / נפח / יחידות) – הנפוצה בין המועמדים
+    const fam = it => it[5] === "kg" ? "g" : it[5];
+    const fams = {};
+    res.forEach(it => { if (it[4] > 0 && fam(it)) fams[fam(it)] = (fams[fam(it)] || 0) + 1; });
+    const top = q.unit || Object.keys(fams).sort((a, b) => fams[b] - fams[a])[0];
+    if (top) res = res.filter(it => !(it[4] > 0) || fam(it) === top);
+    // גודל שביקשו במפורש
+    if (q.size) {
+      const sized = res.filter(it => it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15);
+      if (sized.length) res = sized;
+    } else {
+      // מסננים אריזות קטנטנות/ענקיות: נשארים בטווח של הגודל הנפוץ
+      const sizes = res.filter(it => it[4] > 0 && it[5] !== "kg").map(it => it[4]).sort((a, b) => a - b);
+      if (sizes.length >= 4) {
+        const med = sizes[Math.floor(sizes.length / 2)];
+        res = res.filter(it => !(it[4] > 0) || it[5] === "kg" || (it[4] >= med * 0.45 && it[4] <= med * 2.6));
+      }
+    }
+    return res;
+  }
+
+  function unitPrice(it, price) {   // מחיר לליטר/ק"ג (או ליחידה)
+    if (it[5] === "kg") return price;
+    if (it[4] > 0 && (it[5] === "g" || it[5] === "ml")) return price / it[4] * 1000;
+    if (it[4] > 0 && it[5] === "u") return price / it[4];
+    return null;
+  }
+
+  function priceIn(it, store) {
+    for (const [s, p] of it[3]) if (s === store) return p;
+    return null;
+  }
+
+  // בחירה בסניף: הכי זול ליחידת מידה; כשאין גודל ידוע – הכי זול במחיר
+  function bestIn(cands, store) {
+    let best = null, bestKey = Infinity;
+    for (const it of cands) {
+      const p = priceIn(it, store);
+      if (p == null) continue;
+      const up = unitPrice(it, p);
+      const key = up != null ? up : p * 1000;   // מוצרים בלי גודל ידוע – רק אם אין חלופה
+      if (key < bestKey) { bestKey = key; best = { it, price: p, unitPrice: up }; }
+    }
+    return best;
+  }
+
+  // השוואת סל: lines = [{line, pick?: ברקוד נעול}]
+  function compareBasket(data, lines) {
+    prep(data.items);
+    const byCode = new Map(data.items.map(it => [it[0], it]));
+    const parsed = lines.map(l => {
+      const q = parseLine(l.line);
+      const locked = l.pick && byCode.get(l.pick);
+      return { ...l, q, cands: locked ? [locked] : candidates(data.items, q) };
+    });
+    const stores = data.stores.map((st, si) => {
+      let total = 0, found = 0;
+      const rows = parsed.map(p => {
+        const b = bestIn(p.cands, si);
+        if (!b) return null;
+        found++;
+        const cost = b.price * p.q.qty;
+        total += cost;
+        return { ...b, cost };
+      });
+      return { si, name: st[0] + " – " + st[1], total, found, rows };
+    });
+    stores.sort((a, b) => (b.found - a.found) || (a.total - b.total));
+    // סל משולב: הכי זול מכל סניף
+    const mixed = parsed.map(p => {
+      let best = null;
+      data.stores.forEach((_, si) => {
+        const b = bestIn(p.cands, si);
+        if (b && (!best || b.price * p.q.qty < best.cost)) best = { ...b, si, cost: b.price * p.q.qty };
+      });
+      return best;
+    });
+    return { parsed, stores, mixed };
+  }
+
+  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, compareBasket, prep };
+  if (typeof module !== "undefined") module.exports = api; else root.Match = api;
+})(this);
