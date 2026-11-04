@@ -41,6 +41,19 @@ def main():
             f.write(new + "\n")
 
     A.update_stores()
+    if os.environ.get("DIAG"):
+        from collections import Counter, defaultdict
+        st = A.load_stores()
+        print("DIAG total", len(st))
+        per = defaultdict(Counter)
+        for s in st:
+            per[s["chain"]][s["city"]] += 1
+        for ch, cnt in per.items():
+            print("DIAG chain", ch, len(sum(cnt.values() and [cnt], Counter())), list(cnt.most_common(6)))
+        for s in st:
+            blob = " ".join([s["city"], s["sname"], s["address"]])
+            if "ציונ" in blob or "ness" in blob.lower():
+                print("DIAG match", s)
     all_cities = {}
     for s in A.load_stores():
         if s["city"]:
