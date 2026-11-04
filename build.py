@@ -59,7 +59,8 @@ def main():
     if SITE.exists():
         shutil.rmtree(SITE)
     (SITE / "data").mkdir(parents=True)
-    shutil.copy(ROOT / "web" / "index.html", SITE / "index.html")
+    for f in (ROOT / "web").iterdir():   # הדף + קובצי האפליקציה (אייקונים, manifest, sw.js)
+        shutil.copy(f, SITE / f.name)
 
     meta = []
     for c in cities:

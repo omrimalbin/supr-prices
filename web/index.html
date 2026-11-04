@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="מחירי סופר">
 <meta name="theme-color" content="#1f6f5c">
 <title>מחירי סופר</title>
 <style>
@@ -8,7 +15,7 @@
 @media (prefers-color-scheme:dark){:root{--bg:#151513;--card:#1e1e1b;--ink:#ecebe6;--muted:#9b9a93;--line:#33322e;--accent:#5cc3a6;--soft:#1d3a32;--err:#f2b8b5}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
-header{position:sticky;top:0;z-index:5;background:var(--bg);padding:14px 14px 10px;border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line)}
 h1{font-size:21px;margin:0 0 8px}
 .row{display:flex;gap:8px;align-items:center}
 select,input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:100%}
@@ -29,7 +36,10 @@ main{padding:10px 12px 90px;max-width:700px;margin:0 auto}
 .more{display:block;width:100%;padding:12px;font:inherit;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
 .err{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--err)}
 a{color:var(--accent)}
-.fab{position:fixed;bottom:16px;left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.fab{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+#install{display:none;background:var(--soft);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:14px;align-items:center;gap:10px;justify-content:space-between}
+#install button{font:inherit;font-weight:600;border:0;background:var(--accent);color:#fff;border-radius:10px;padding:8px 14px}
+#install .x{background:none;color:var(--muted);padding:4px 8px}
 </style></head><body>
 <header>
   <h1>מחירי סופר</h1>
@@ -40,6 +50,7 @@ a{color:var(--accent)}
     <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
   </div>
   <div class="muted" id="meta" style="margin-top:6px"></div>
+  <div id="install"><span id="installText">להתקין כאפליקציה במסך הבית?</span><span><button id="installBtn">התקנה</button><button class="x" id="installX">✕</button></span></div>
 </header>
 <main id="list"><div class="muted">טוען…</div></main>
 <a class="fab" id="refresh" target="_blank" rel="noopener">רענון עכשיו / הוספת עיר</a>
@@ -96,5 +107,17 @@ function draw(){
 }
 $('#city').onchange=loadCity;
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
+// ---- התקנה כאפליקציה ----
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+let deferred=null;
+function showInstall(){ if(standalone||LS.get('noInstall','')) return; $('#install').style.display='flex'; }
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;showInstall();});
+if(isIOS&&!standalone){ $('#installText').innerHTML='להתקנה: לחצו על <b>שיתוף</b> (ריבוע עם חץ למעלה) ואז <b>"הוספה למסך הבית"</b>'; $('#installBtn').hidden=true; showInstall(); }
+$('#installBtn').onclick=async()=>{ if(!deferred)return; deferred.prompt(); await deferred.userChoice; deferred=null; $('#install').style.display='none'; };
+$('#installX').onclick=()=>{ LS.set('noInstall','1'); $('#install').style.display='none'; };
+addEventListener('appinstalled',()=>{$('#install').style.display='none';});
+
 init().catch(e=>$('#list').innerHTML=`<div class="err">הנתונים עוד לא מוכנים – ההרצה הראשונה לוקחת כחצי שעה. (${esc(e.message)})</div>`);
 </script></body></html>
