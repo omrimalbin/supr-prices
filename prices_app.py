@@ -281,6 +281,9 @@ FIELDS = [
     ("qty", ["quantity"]),
     ("unit", ["unitofmeasure", "unitqty"]),
     ("upd", ["priceupdatedate"]),
+    ("w", ["bisweighted", "blsweighted"]),
+    ("uq", ["unitqty"]),
+    ("uom", ["unitofmeasure"]),
 ]
 
 

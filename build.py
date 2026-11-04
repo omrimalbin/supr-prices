@@ -19,6 +19,55 @@ SITE = ROOT / "site"
 CITIES_FILE = ROOT / "cities.txt"
 
 
+import re
+
+_U = [  # (ביטוי, יחידה בסיסית, מכפיל)
+    (r'ק"ג|ק״ג|קג|קילוגרם|קילוגרמים|קילו|ק\'ג', "g", 1000),
+    (r'גרם|גרמים|גר\'|גר|ג\'|ג', "g", 1),
+    (r'מ"ל|מ״ל|מל|מיליליטר|מיליליטרים|מ\'ל', "ml", 1),
+    (r'ליטר|ליטרים|ל\'|ל', "ml", 1000),
+]
+_NUM = r"(\d+(?:[.,]\d+)?)"
+
+
+def _unit_of(text):
+    t = (text or "").strip().replace("׳", "'").replace("״", '"')
+    for pat, base, mul in _U:
+        if re.fullmatch(r"(?:" + pat + r")\.?", t):
+            return base, mul
+    return None
+
+
+def parse_size(r):
+    """גודל אריזה בגרם/מ"ל (או מוצר שקל = מחיר לק"ג)."""
+    if (r.get("w") or "").strip() in ("1", "true", "True"):
+        return 1000, "kg"
+    name = (r.get("name") or "").replace("׳", "'").replace("״", '"')
+    # מהשם: "6*1.5 ליטר", "1.5 ליטר", "500 גרם", "1ק"ג"
+    for pat, base, mul in _U:
+        m = re.search(r"(\d+)\s*[*xX×]\s*" + _NUM + r"\s*(?:" + pat + r")(?![א-ת])", name)
+        if m:
+            return round(int(m.group(1)) * float(m.group(2).replace(",", ".")) * mul), base
+    for pat, base, mul in _U:
+        m = re.search(_NUM + r"\s*(?:" + pat + r")(?![א-ת])", name)
+        if m:
+            v = float(m.group(1).replace(",", ".")) * mul
+            if v > 0:
+                return round(v), base
+    # מהשדות: Quantity + UnitQty
+    try:
+        q = float((r.get("qty") or "0").replace(",", "."))
+    except ValueError:
+        q = 0
+    u = _unit_of(r.get("uq")) or _unit_of(r.get("unit"))
+    if q > 0 and u:
+        return round(q * u[1]), u[0]
+    m = re.search(r"(\d+)\s*(?:יח'|יחידות|יח)(?![א-ת])", name)
+    if m:
+        return int(m.group(1)), "u"
+    return 0, ""
+
+
 def slug(city):
     return hashlib.md5(city.encode("utf-8")).hexdigest()[:10]
 
@@ -80,7 +129,10 @@ def main():
                 if k not in idx:
                     idx[k] = len(stores)
                     stores.append([r["chain"], r["sname"] or "סניף " + r["store"]])
-                it = items.setdefault(r["barcode"], [r["barcode"], r["name"], r["manu"], []])
+                it = items.get(r["barcode"])
+                if it is None:
+                    size, unit = parse_size(r)
+                    it = items[r["barcode"]] = [r["barcode"], r["name"], r["manu"], [], size, unit]
                 if not it[1]:
                     it[1] = r["name"]
                 it[3].append([idx[k], round(pr, 2)])
