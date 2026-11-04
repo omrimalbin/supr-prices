@@ -269,7 +269,7 @@ def price_file_for(folder, store):
     d = DUMPS / folder
     if not d.exists():
         return None
-    pat = re.compile(r"^pricefull\d*-0*" + re.escape(store) + r"-", re.I)
+    pat = re.compile(r"^pricefull.*?-0*" + re.escape(store) + r"-", re.I)
     return newest([p for p in d.iterdir() if p.is_file() and pat.match(p.name)])
 
 
@@ -404,11 +404,15 @@ def fetch_city(city, auto=False):
     log(f"נמצאו {len(stores)} סניפים ב{city} של {len(by_scraper)} רשתות")
     for i, (scraper, ids) in enumerate(sorted(by_scraper.items()), 1):
         log(f"({i}/{len(by_scraper)}) שואב מחירים מ{CHAIN_HE.get(scraper, scraper)} – {len(ids)} סניפים")
-        regex = r"(?i)pricefull\d*-0*(" + "|".join(sorted(map(re.escape, ids))) + r")-"
+        # אותו דפוס שהספרייה משתמשת בו לסינון לפי סניף: -<מספר סניף>-
+        regex = r"-0*(" + "|".join(sorted(map(re.escape, ids))) + r")-"
         try:
             run_scrape([scraper], "PRICE_FULL_FILE", regex)
         except Exception as e:  # noqa
             log(f"   נכשל: {e}")
+        folder = next((s["folder"] for s in stores if s["scraper"] == scraper), "")
+        got = [p.name for p in (DUMPS / folder).glob("*") if p.name.lower().startswith("pricefull")] if folder else []
+        log(f"   קבצי מחירים בתיקייה: {len(got)} {got[:4]}")
     d = city_data(city)
     log(f"מוכן: {len(d['items']):,} מוצרים מ-{d['stores_with_prices']} סניפים")
     s = load_settings()
