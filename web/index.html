@@ -61,6 +61,13 @@ textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12
 .offer{background:#fff4e0;border:1px solid #f0c27a;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px;color:#1d1d1b}
 .offer .row{margin-top:6px}.offer button{font:inherit;font-size:14px;border-radius:8px;padding:6px 12px;border:1px solid #d08b1f;background:#fff}
 .offer button.yes{background:#d08b1f;color:#fff;border-color:#d08b1f}
+.plist{background:var(--card);border:1px solid #f0c27a;border-radius:14px;padding:4px 12px;margin:10px 0}
+.plist summary{cursor:pointer;font-weight:600;padding:8px 0;color:#b25e00}
+@media (prefers-color-scheme:dark){.plist summary{color:#f0b35a}}
+.plist h4{font-size:14px;margin:10px 0 4px;color:var(--muted)}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.prow button{font:inherit;font-size:13px;border-radius:8px;padding:5px 10px;border:1px solid #d08b1f;background:var(--card);color:#b25e00;white-space:nowrap}
+.prow button.add{background:#d08b1f;color:#fff}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
@@ -154,7 +161,15 @@ let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},1
 // ---- רשימת קניות ----
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
 const picks=JSON.parse(LS.get('picks','{}'));
-const deals=JSON.parse(LS.get('deals','{}'));
+const deals=JSON.parse(LS.get('deals','{}'));      // מבצעים שנדחו: key -> false
+const qtyOv=JSON.parse(LS.get('qtyov','{}'));      // שורה -> {qty, orig, desc, where, key}
+function saveDeals(){LS.set('deals',JSON.stringify(deals));LS.set('qtyov',JSON.stringify(qtyOv));}
+function applyDeal(p,d,where){                      // מימוש מבצע: הגדלת הכמות בשורה – בכל הסניפים
+  const k=keyOf(p.line), orig=(qtyOv[k]&&qtyOv[k].orig)||Match.parseLine(p.line).qty;
+  const cur=p.q.qty, qty=Math.max(cur,Math.ceil(cur/d.mq-1e-9)*d.mq);
+  qtyOv[k]={qty,orig,desc:data.promos[d.offer[2]],where,key:d.key,name:d.it[1]};
+  delete deals[d.key]; saveDeals(); runBasket();}
+function cancelDeal(k){const o=qtyOv[k]; if(!o)return; deals[o.key]=false; delete qtyOv[k]; saveDeals(); runBasket();}
 const promoTxt=e=>e&&e[2]?e[2].map(o=>data.promos[o[2]]).join(' · '):'';
 function setTab(t){tab=t;LS.set('tab',t);
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
@@ -173,7 +188,7 @@ function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return i
 function runBasket(){
   if(!data){$('#bres').innerHTML='<div class="muted">אין נתונים לעיר הזו</div>';return;}
   const ls=lines(); if(!ls.length){$('#bres').innerHTML='';return;}
-  const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)]})),deals);lastRes=res;
+  const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)],qty:qtyOv[keyOf(l)]&&qtyOv[keyOf(l)].qty})),deals);lastRes=res;
   const n=ls.length;
   if(selStore==null) selStore=res.stores[0].si;
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
@@ -187,16 +202,34 @@ function runBasket(){
   h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="sub">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · חסרים ${n-mixedFound}`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
   const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
   const title=selStore==='mix'?'סל משולב':res.stores.find(s=>s.si===selStore).name;
+  // ---- לוח מבצעים ----
+  const storeName=si=>data.stores[si].join(' – ');
+  const realized=res.parsed.map((p,i)=>({p,i,o:qtyOv[keyOf(p.line)]})).filter(x=>x.o);
+  const autoUsed=res.parsed.map((p,i)=>({p,r:rows[i]})).filter(x=>x.r&&x.r.promo);
+  const avail=[];
+  res.parsed.forEach((p,i)=>{const r=rows[i]; const si=selStore==='mix'?(r&&r.si):selStore; if(si==null)return;
+    Match.dealsFor(p.cands,si).filter(d=>d.mq>p.q.qty+1e-9&&!(r&&r.promo&&Match.dealKey(r.it,r.promo)===d.key)).slice(0,3)
+      .forEach(d=>avail.push({p,i,d,si}));});
+  window._avail=avail;
+  const saved=autoUsed.reduce((a,x)=>a+Math.max(0,x.r.price*x.r.used-x.r.cost),0);
+  h+=`<details class="plist" ${LS.get('popen','')?'open':''}><summary>🏷️ מבצעים ברשימה · ${realized.length} מומשו בהגדלת כמות · ${autoUsed.length} בסל · ${avail.length} זמינים</summary>`;
+  if(realized.length) h+='<h4>מומשו – הכמות הוגדלה בכל הסניפים</h4>'+realized.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${x.o.orig} ← ${x.o.qty}<div class="sub">${esc(x.o.desc)} · ${esc(x.o.where)}</div></div><button data-cancel="${esc(keyOf(x.p.line))}">ביטול</button></div>`).join('');
+  if(autoUsed.length) h+=`<h4>נכללו בסל ב${esc(title)}${saved>0.005?` · חיסכון ${nis(saved)}`:''}</h4>`+autoUsed.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.r.it[1])}<div class="sub">${esc(data.promos[x.r.promo[2]])}</div></div><span class="promo">−${nis(Math.max(0,x.r.price*x.r.used-x.r.cost))}</span></div>`).join('');
+  if(avail.length) h+=`<h4>מבצעי כמות זמינים${selStore==='mix'?'':' ב'+esc(title)}</h4>`+avail.map((x,j)=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.d.it[1])}<div class="sub">${esc(data.promos[x.d.offer[2]])} · ${x.d.mq} ב-${nis(x.d.bundle)} (${nis(x.d.unit)} ליח' במקום ${nis(x.d.price)})${selStore==='mix'?' · '+esc(storeName(x.si)):''}</div></div><button class="add" data-add="${j}">הוספה</button></div>`).join('');
+  if(!realized.length&&!autoUsed.length&&!avail.length) h+='<div class="sub" style="padding-bottom:8px">אין מבצעים רלוונטיים לרשימה הזו</div>';
+  h+='</details>';
   h+=`<h3>הפירוט – ${esc(title)}</h3>`;
   h+=res.parsed.map((p,i)=>{const r=rows[i];const locked=!!picks[keyOf(p.line)];
     if(!r) return `<div class="line"><div class="q">${esc(p.line)}</div><div class="sub miss">${p.cands.length?'לא נמכר בסניף הזה':'לא נמצא מוצר מתאים – נסו לנסח אחרת'}</div><button class="swap" data-i="${i}">בחירת מוצר</button></div>`;
     const it=r.it, si=selStore==='mix'?r.si:selStore;
-    const promoLine=r.promo?`<div class="promo">🏷️ ${esc(data.promos[r.promo[2]])}${r.bulk?` · הכמות הוגדלה ל-${r.used}`:''}</div>`:'';
+    const ov=qtyOv[keyOf(p.line)];
+    const promoLine=(r.promo?`<div class="promo">🏷️ ${esc(data.promos[r.promo[2]])}</div>`:'')
+      +(ov?`<div class="promo">⬆️ הכמות הוגדלה מ-${ov.orig} ל-${ov.qty} בעקבות מבצע (בכל הסניפים) <a href="#" data-cancel="${esc(keyOf(p.line))}" style="color:inherit">ביטול</a></div>`:'');
     const regular=r.price*r.used;
     let offer='';
     if(r.offer){const o=r.offer;offer=`<div class="offer">🏷️ <b>מבצע:</b> ${esc(data.promos[o.offer[2]])}<br>
       ${esc(o.it[1])} – ${o.mq} ב-${nis(o.bundle)} (${nis(o.unit)} ליחידה במקום ${nis(o.price)})<br>להגדיל את הכמות ל-${o.mq} ולממש את המבצע?
-      <div class="row"><button class="yes" data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="1">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
+      <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line"><div class="top"><div><div class="q">${esc(p.line)}</div>
       <div>${esc(it[1])}${r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div><div class="sub">${esc([sizeTxt(it),upTxt(it,r.cost/r.used)].filter(Boolean).join(' · '))}${selStore==='mix'?' · '+esc(data.stores[r.si].join(' – ')):''}</div>
       ${promoLine}${locked?'<div class="lock">🔒 מוצר נעול</div>':''}</div>
@@ -205,7 +238,12 @@ function runBasket(){
   $('#bres').innerHTML=h;
   document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();});
   document.querySelectorAll('.swap').forEach(b=>b.onclick=()=>openPicker(+b.dataset.i));
-  document.querySelectorAll('[data-deal]').forEach(b=>b.onclick=()=>{deals[b.dataset.deal]=b.dataset.v==='1';LS.set('deals',JSON.stringify(deals));runBasket();});
+  document.querySelectorAll('[data-deal]').forEach(b=>b.onclick=()=>{deals[b.dataset.deal]=false;saveDeals();runBasket();});
+  document.querySelectorAll('[data-yes]').forEach(b=>b.onclick=()=>{const i=+b.dataset.yes,p=res.parsed[i],r=rows[i],si=selStore==='mix'?r.si:selStore;
+    const o=r.offer; applyDeal(p,{mq:o.mq,offer:o.offer,key:Match.dealKey(o.it,o.offer),it:o.it},storeName(si));});
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{e.preventDefault();const x=window._avail[+b.dataset.add];applyDeal(x.p,x.d,storeName(x.si));});
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cancelDeal(b.dataset.cancel);});
+  const det=document.querySelector('.plist'); if(det) det.ontoggle=()=>LS.set('popen',det.open?'1':'');
 }
 function openPicker(i){
   const p=lastRes.parsed[i], key=keyOf(p.line);

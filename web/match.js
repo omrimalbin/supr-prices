@@ -155,6 +155,7 @@
     const byCode = new Map(data.items.map(it => [it[0], it]));
     const parsed = lines.map(l => {
       const q = parseLine(l.line);
+      if (l.qty) q.qty = l.qty;                 // כמות שהוגדלה בעקבות מבצע
       const locked = l.pick && byCode.get(l.pick);
       return { ...l, q, cands: locked ? [locked] : candidates(data.items, q) };
     });
@@ -182,6 +183,22 @@
     return { parsed, stores, mixed };
   }
 
-  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, compareBasket, prep };
+  // כל מבצעי הכמות על מוצרים שמתאימים לשורה, בסניף מסוים (מהמשתלם ביותר)
+  function dealsFor(cands, store) {
+    const out = [], seen = new Set();
+    for (const it of cands) {
+      const e = entryIn(it, store);
+      if (!e || !e[2]) continue;
+      for (const o of e[2]) {
+        const k = dealKey(it, o);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push({ it, offer: o, price: e[1], mq: o[0], bundle: o[1], unit: o[1] / o[0], key: k, rank: normKey(it, o[1] / o[0]) });
+      }
+    }
+    return out.sort((a, b) => a.rank - b.rank);
+  }
+
+  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, dealsFor, compareBasket, prep };
   if (typeof module !== "undefined") module.exports = api; else root.Match = api;
 })(this);
