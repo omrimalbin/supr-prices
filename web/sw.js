@@ -1,6 +1,6 @@
 // שומר עותק של האפליקציה והנתונים האחרונים, כדי שתיפתח גם בלי אינטרנט.
 // תמיד מנסה קודם את הרשת (נתונים טריים), ונופל לעותק השמור רק כשאין חיבור.
-const CACHE = "prices-v15";
+const CACHE = "prices-v16";
 const SHELL = ["./", "index.html", "match.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,7 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
   const key = new URL(req.url); key.search = "";          // בלי פרמטרי עקיפת מטמון
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: "no-cache" }).then(res => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key.href, copy)); }
       return res;
     }).catch(() => caches.match(key.href).then(r => r || caches.match("index.html")))
