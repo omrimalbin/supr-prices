@@ -56,6 +56,12 @@ textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12
 .miss{color:var(--err)}
 .swap{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--accent);border-radius:8px;padding:3px 9px;margin-top:6px}
 .lock{font-size:12px;color:var(--accent)}
+.promo{font-size:13px;color:#b25e00;margin-top:2px}
+@media (prefers-color-scheme:dark){.promo{color:#f0b35a}}
+.offer{background:#fff4e0;border:1px solid #f0c27a;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px;color:#1d1d1b}
+.offer .row{margin-top:6px}.offer button{font:inherit;font-size:14px;border-radius:8px;padding:6px 12px;border:1px solid #d08b1f;background:#fff}
+.offer button.yes{background:#d08b1f;color:#fff;border-color:#d08b1f}
+.old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
 #picker .opt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
@@ -134,13 +140,13 @@ function draw(){
     <div class="top"><div><div class="name">${esc(it[1]||'(ללא שם)')}</div>
     <div class="sub">${it[2]?esc(it[2])+' · ':''}<span class="bc">${esc(it[0])}</span></div>
     <div class="sub">הכי זול ב${esc(st[it[3][0][0]][0])} – ${esc(st[it[3][0][0]][1])}${it.n>1?` · עד ${nis(it.max)} · ${it.n} סניפים`:''}</div></div>
-    <div class="price">${nis(it.min)}</div></div></div>`).join('')
+    <div class="price">${nis(it.min)}</div></div>${it[3].some(e=>e[2])?'<div class="promo">🏷️ יש מבצע</div>':''}</div>`).join('')
     +(r.length>shown?`<button class="more" id="more">הצגת עוד (${(r.length-shown).toLocaleString('he-IL')})</button>`:'');
   const vis=r.slice(0,shown);
   document.querySelectorAll('.item').forEach(el=>el.onclick=()=>{
     const ex=el.querySelector('.det');if(ex){ex.remove();return;}
     const it=vis[+el.dataset.i];const d=document.createElement('div');d.className='det';
-    d.innerHTML=it[3].map(([s,p])=>`<div><span>${esc(st[s][0])} – ${esc(st[s][1])}</span><span>${nis(p)}</span></div>`).join('');el.appendChild(d);});
+    d.innerHTML=it[3].map(e=>`<div><span>${esc(st[e[0]][0])} – ${esc(st[e[0]][1])}${e[2]?`<br><span class="promo">🏷️ ${esc(promoTxt(e))}</span>`:''}</span><span>${nis(e[1])}</span></div>`).join('');el.appendChild(d);});
   const m=$('#more');if(m)m.onclick=()=>{shown+=100;draw();};
 }
 $('#city').onchange=loadCity;
@@ -148,6 +154,8 @@ let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},1
 // ---- רשימת קניות ----
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
 const picks=JSON.parse(LS.get('picks','{}'));
+const deals=JSON.parse(LS.get('deals','{}'));
+const promoTxt=e=>e&&e[2]?e[2].map(o=>data.promos[o[2]]).join(' · '):'';
 function setTab(t){tab=t;LS.set('tab',t);
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
   document.querySelectorAll('.prodOnly').forEach(x=>x.hidden=t!=='prod');
@@ -165,14 +173,16 @@ function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return i
 function runBasket(){
   if(!data){$('#bres').innerHTML='<div class="muted">אין נתונים לעיר הזו</div>';return;}
   const ls=lines(); if(!ls.length){$('#bres').innerHTML='';return;}
-  const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)]})));lastRes=res;
+  const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)]})),deals);lastRes=res;
   const n=ls.length;
   if(selStore==null) selStore=res.stores[0].si;
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
   let h='<h3>השוואה בין הסניפים</h3>';
   h+=res.stores.map((s,i)=>`<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}">
      <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
-     <div class="sub ${s.found<n?'miss':''}">${s.found===n?'כל הפריטים קיימים':`חסרים ${n-s.found} מתוך ${n} פריטים`}</div></div>
+     <div class="sub ${s.found<n?'miss':''}">${s.found===n?'כל הפריטים קיימים':`חסרים ${n-s.found} מתוך ${n} פריטים`}</div>
+     ${s.rows.some(r=>r&&r.promo)?`<div class="promo">🏷️ כולל ${s.rows.filter(r=>r&&r.promo).length} מבצעים</div>`:''}
+     ${s.offers?`<div class="promo">❓ ${s.offers} מבצעי כמות מחכים לאישור</div>`:''}</div>
      <div class="tot">${nis(s.total)}</div></div></div>`).join('');
   h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="sub">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · חסרים ${n-mixedFound}`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
   const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
@@ -180,14 +190,22 @@ function runBasket(){
   h+=`<h3>הפירוט – ${esc(title)}</h3>`;
   h+=res.parsed.map((p,i)=>{const r=rows[i];const locked=!!picks[keyOf(p.line)];
     if(!r) return `<div class="line"><div class="q">${esc(p.line)}</div><div class="sub miss">${p.cands.length?'לא נמכר בסניף הזה':'לא נמצא מוצר מתאים – נסו לנסח אחרת'}</div><button class="swap" data-i="${i}">בחירת מוצר</button></div>`;
-    const it=r.it;
+    const it=r.it, si=selStore==='mix'?r.si:selStore;
+    const promoLine=r.promo?`<div class="promo">🏷️ ${esc(data.promos[r.promo[2]])}${r.bulk?` · הכמות הוגדלה ל-${r.used}`:''}</div>`:'';
+    const regular=r.price*r.used;
+    let offer='';
+    if(r.offer){const o=r.offer;offer=`<div class="offer">🏷️ <b>מבצע:</b> ${esc(data.promos[o.offer[2]])}<br>
+      ${esc(o.it[1])} – ${o.mq} ב-${nis(o.bundle)} (${nis(o.unit)} ליחידה במקום ${nis(o.price)})<br>להגדיל את הכמות ל-${o.mq} ולממש את המבצע?
+      <div class="row"><button class="yes" data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="1">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line"><div class="top"><div><div class="q">${esc(p.line)}</div>
-      <div>${esc(it[1])}</div><div class="sub">${esc([sizeTxt(it),upTxt(it,r.price)].filter(Boolean).join(' · '))}${selStore==='mix'?' · '+esc(data.stores[r.si].join(' – ')):''}</div>
-      ${locked?'<div class="lock">🔒 מוצר נעול</div>':''}</div><div class="p">${nis(r.cost)}</div></div>
-      <button class="swap" data-i="${i}">החלפה</button></div>`;}).join('');
+      <div>${esc(it[1])}${r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div><div class="sub">${esc([sizeTxt(it),upTxt(it,r.cost/r.used)].filter(Boolean).join(' · '))}${selStore==='mix'?' · '+esc(data.stores[r.si].join(' – ')):''}</div>
+      ${promoLine}${locked?'<div class="lock">🔒 מוצר נעול</div>':''}</div>
+      <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
+      ${offer}<button class="swap" data-i="${i}">החלפה</button></div>`;}).join('');
   $('#bres').innerHTML=h;
   document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();});
   document.querySelectorAll('.swap').forEach(b=>b.onclick=()=>openPicker(+b.dataset.i));
+  document.querySelectorAll('[data-deal]').forEach(b=>b.onclick=()=>{deals[b.dataset.deal]=b.dataset.v==='1';LS.set('deals',JSON.stringify(deals));runBasket();});
 }
 function openPicker(i){
   const p=lastRes.parsed[i], key=keyOf(p.line);

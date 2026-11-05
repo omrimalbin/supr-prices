@@ -265,12 +265,83 @@ def city_names():
     return counts
 
 
-def price_file_for(folder, store):
+def price_file_for(folder, store, kind="pricefull"):
     d = DUMPS / folder
     if not d.exists():
         return None
-    pat = re.compile(r"^pricefull.*?-0*" + re.escape(store) + r"-", re.I)
+    pat = re.compile(r"^" + kind + r".*?-0*" + re.escape(store) + r"-", re.I)
     return newest([p for p in d.iterdir() if p.is_file() and pat.match(p.name)])
+
+
+def _date(s):
+    s = (s or "").strip()
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
+    if m:
+        return s[:10]
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if m:
+        return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return ""
+
+
+def _num(s):
+    try:
+        return float((s or "").replace(",", ".").strip() or 0)
+    except ValueError:
+        return 0.0
+
+
+def parse_promos(p):
+    """מבצעים פעילים לכלל הלקוחות (בלי מועדון/קופון).
+    מחזיר {ברקוד: [(כמות מינימלית, מחיר לכמות או None, אחוז הנחה או 0, תיאור), ...]}"""
+    try:
+        import datetime
+        from zoneinfo import ZoneInfo
+        today = datetime.datetime.now(ZoneInfo("Asia/Jerusalem")).strftime("%Y-%m-%d")
+    except Exception:  # noqa
+        today = time.strftime("%Y-%m-%d")
+    out = {}
+    for el in read_xml(p).iter():
+        if tag(el) not in ("promotion", "sale"):
+            continue
+        f = {}
+        codes, clubs = [], []
+        for c in el.iter():
+            t = tag(c)
+            if len(c) == 0:
+                v = (c.text or "").strip()
+                if t == "itemcode":
+                    codes.append(v)
+                elif t == "clubid":
+                    clubs.append(v)
+                elif t not in f:
+                    f[t] = v
+        if not codes:
+            continue
+        start, end = _date(f.get("promotionstartdate")), _date(f.get("promotionenddate"))
+        if (start and start > today) or (end and end < today):
+            continue
+        club_ids = [re.match(r"\s*(\d+)", c).group(1) for c in clubs if re.match(r"\s*\d+", c)]
+        if club_ids and "0" not in club_ids:
+            continue                                  # למועדון בלבד
+        if f.get("additionaliscoupon") == "1" or _num(f.get("minpurchaseamnt")) > 0:
+            continue
+        if f.get("additionalisactive") == "0" or f.get("isgiftitem") == "1":
+            continue
+        mq = _num(f.get("minqty")) or 1
+        dp = _num(f.get("discountedprice"))
+        rate = _num(f.get("discountrate"))
+        rt = f.get("rewardtype", "1")
+        desc = f.get("promotiondescription", "")
+        if rt == "1" and dp > 0:
+            promo = (mq, round(dp, 2), 0, desc)
+        elif rate > 0 and rt in ("2", "1"):
+            promo = (mq, None, rate / 100 if rate > 100 else rate, desc)
+        else:
+            continue
+        for code in codes:
+            out.setdefault(code, []).append(promo)
+    return out
 
 
 FIELDS = [
@@ -413,9 +484,14 @@ def fetch_city(city, auto=False):
             run_scrape([scraper], "PRICE_FULL_FILE", regex)
         except Exception as e:  # noqa
             log(f"   נכשל: {e}")
+        try:
+            run_scrape([scraper], "PROMO_FULL_FILE", regex)
+        except Exception as e:  # noqa
+            log(f"   מבצעים נכשלו: {e}")
         folder = next((s["folder"] for s in stores if s["scraper"] == scraper), "")
         got = [p.name for p in (DUMPS / folder).glob("*") if p.name.lower().startswith("pricefull")] if folder else []
-        log(f"   קבצי מחירים בתיקייה: {len(got)} {got[:4]}")
+        pr = [p.name for p in (DUMPS / folder).glob("*") if p.name.lower().startswith("promofull")] if folder else []
+        log(f"   קבצי מחירים: {len(got)}, קבצי מבצעים: {len(pr)} {pr[:2]}")
     d = city_data(city)
     log(f"מוכן: {len(d['items']):,} מוצרים מ-{d['stores_with_prices']} סניפים")
     s = load_settings()

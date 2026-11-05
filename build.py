@@ -118,6 +118,16 @@ def main():
             A.fetch_city(c)
             d = A.city_data(c)
             stores, idx, items = [], {}, {}
+            # מבצעים לכל סניף
+            promo_by_store, descs, desc_idx = {}, [], {}
+            npromo = 0
+            for st in A.city_stores(c):
+                pf = A.price_file_for(st["folder"], st["store"], "promofull")
+                if pf:
+                    try:
+                        promo_by_store[(st["chain"], st["store"])] = A.parse_promos(pf)
+                    except Exception as e:  # noqa
+                        print("promo parse failed", pf.name, e)
             for r in d["full"]:
                 try:
                     pr = float(r["price"])
@@ -135,18 +145,39 @@ def main():
                     it = items[r["barcode"]] = [r["barcode"], r["name"], r["manu"], [], size, unit]
                 if not it[1]:
                     it[1] = r["name"]
-                it[3].append([idx[k], round(pr, 2)])
+                pe = [idx[k], round(pr, 2)]
+                offers = {}
+                for mq, bundle, rate, desc in promo_by_store.get(k, {}).get(r["barcode"], []):
+                    if bundle is None:
+                        bundle = mq * pr * (1 - rate / 100)
+                    unit = bundle / mq
+                    if not (0.15 * pr <= unit < pr * 0.995):
+                        continue                      # לא הגיוני / לא באמת הנחה
+                    key = round(mq, 3)
+                    if key not in offers or bundle < offers[key][1]:
+                        if desc not in desc_idx:
+                            desc_idx[desc] = len(descs)
+                            descs.append(desc)
+                        offers[key] = [key, round(bundle, 2), desc_idx[desc]]
+                if offers:
+                    pe.append(sorted(offers.values())[:3])
+                    npromo += 1
+                it[3].append(pe)
             for it in items.values():
                 it[3].sort(key=lambda x: x[1])
             (SITE / "data" / f"{entry['slug']}.json").write_text(
-                json.dumps({"stores": stores, "items": list(items.values())}, ensure_ascii=False,
+                json.dumps({"stores": stores, "items": list(items.values()), "promos": descs}, ensure_ascii=False,
                            separators=(",", ":")), encoding="utf-8")
-            entry.update(stores=len(A.city_stores(c)), with_prices=len(stores), items=len(items))
+            entry.update(stores=len(A.city_stores(c)), with_prices=len(stores), items=len(items), promos=npromo)
+            print(f"{c}: {len(items)} מוצרים, {npromo} מחירים עם מבצע, {len(descs)} מבצעים")
         except Exception as e:  # noqa
             entry["error"] = str(e)
             entry["suggestions"] = difflib.get_close_matches(c, list(all_cities), n=5, cutoff=0.5)
         meta.append(entry)
 
+    (SITE / "data" / "stores.json").write_text(json.dumps(
+        [[s["chain"], s["store"], s["sname"], s["city"], s["address"]] for s in A.load_stores()],
+        ensure_ascii=False), encoding="utf-8")
     (SITE / "data" / "cities.json").write_text(json.dumps({
         "updated": time.time(),
         "repo": os.environ.get("GITHUB_REPOSITORY", ""),

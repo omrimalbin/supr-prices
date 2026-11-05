@@ -110,26 +110,47 @@
     return null;
   }
 
-  function priceIn(it, store) {
-    for (const [s, p] of it[3]) if (s === store) return p;
+  function entryIn(it, store) {
+    for (const e of it[3]) if (e[0] === store) return e;
     return null;
   }
+  function priceIn(it, store) { const e = entryIn(it, store); return e ? e[1] : null; }
+  const normKey = (it, eff) => { const u = unitPrice(it, eff); return u != null ? u : eff * 1000; };
+  const dealKey = (it, o) => it[0] + "|" + o[0] + "|" + o[1];
 
-  // בחירה בסניף: הכי זול ליחידת מידה; כשאין גודל ידוע – הכי זול במחיר
-  function bestIn(cands, store) {
-    let best = null, bestKey = Infinity;
+  // המוצר הכי משתלם בסניף לכמות qty, כולל מבצעים.
+  // deals[key] = true/false – החלטת המשתמש על מבצע שדורש כמות גדולה יותר.
+  function bestIn(cands, store, qty = 1, deals = {}) {
+    let best = null, pending = null;
     for (const it of cands) {
-      const p = priceIn(it, store);
-      if (p == null) continue;
-      const up = unitPrice(it, p);
-      const key = up != null ? up : p * 1000;   // מוצרים בלי גודל ידוע – רק אם אין חלופה
-      if (key < bestKey) { bestKey = key; best = { it, price: p, unitPrice: up }; }
+      const e = entryIn(it, store);
+      if (!e) continue;
+      const price = e[1];
+      const opts = [{ cost: qty * price, used: qty, promo: null }];
+      for (const o of (e[2] || [])) {
+        const [mq, bundle] = o;
+        if (mq <= qty + 1e-9) {
+          const n = Math.floor(qty / mq + 1e-9);
+          opts.push({ cost: n * bundle + (qty - n * mq) * price, used: qty, promo: o });
+        } else if (deals[dealKey(it, o)] === true) {
+          const used = Math.ceil(qty / mq - 1e-9) * mq;
+          opts.push({ cost: used / mq * bundle, used, promo: o, bulk: true });
+        } else if (deals[dealKey(it, o)] !== false) {
+          const k = normKey(it, bundle / mq);
+          if (!pending || k < pending.key) pending = { it, offer: o, key: k, price, mq, bundle, unit: bundle / mq };
+        }
+      }
+      for (const op of opts) {
+        const key = normKey(it, op.cost / op.used);
+        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, ...op };
+      }
     }
+    if (best && pending && pending.key < best.key * 0.98) best.offer = pending;   // מבצע כמות שמשתלם יותר – לשאול
     return best;
   }
 
   // השוואת סל: lines = [{line, pick?: ברקוד נעול}]
-  function compareBasket(data, lines) {
+  function compareBasket(data, lines, deals = {}) {
     prep(data.items);
     const byCode = new Map(data.items.map(it => [it[0], it]));
     const parsed = lines.map(l => {
@@ -138,30 +159,29 @@
       return { ...l, q, cands: locked ? [locked] : candidates(data.items, q) };
     });
     const stores = data.stores.map((st, si) => {
-      let total = 0, found = 0;
+      let total = 0, found = 0, offers = 0;
       const rows = parsed.map(p => {
-        const b = bestIn(p.cands, si);
+        const b = bestIn(p.cands, si, p.q.qty, deals);
         if (!b) return null;
         found++;
-        const cost = b.price * p.q.qty;
-        total += cost;
-        return { ...b, cost };
+        total += b.cost;
+        if (b.offer) offers++;
+        return b;
       });
-      return { si, name: st[0] + " – " + st[1], total, found, rows };
+      return { si, name: st[0] + " – " + st[1], total, found, offers, rows };
     });
     stores.sort((a, b) => (b.found - a.found) || (a.total - b.total));
-    // סל משולב: הכי זול מכל סניף
     const mixed = parsed.map(p => {
       let best = null;
       data.stores.forEach((_, si) => {
-        const b = bestIn(p.cands, si);
-        if (b && (!best || b.price * p.q.qty < best.cost)) best = { ...b, si, cost: b.price * p.q.qty };
+        const b = bestIn(p.cands, si, p.q.qty, deals);
+        if (b && (!best || b.key < best.key)) best = { ...b, si };
       });
       return best;
     });
     return { parsed, stores, mixed };
   }
 
-  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, compareBasket, prep };
+  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, compareBasket, prep };
   if (typeof module !== "undefined") module.exports = api; else root.Match = api;
 })(this);
