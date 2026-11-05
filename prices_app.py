@@ -372,9 +372,9 @@ def parse_prices(p):
 _city_cache = {}
 
 
-def city_data(city):
-    """כל המוצרים בסניפי העיר + השוואה לפי ברקוד."""
-    stores = city_stores(city)
+def city_data(city, stores=None):
+    """כל המוצרים בסניפי העיר (או ברשימת סניפים נתונה) + השוואה לפי ברקוד."""
+    stores = city_stores(city) if stores is None else stores
     files = [(s, price_file_for(s["folder"], s["store"])) for s in stores]
     files = [(s, f) for s, f in files if f]
     key = tuple((f.name, f.stat().st_mtime) for _, f in files)
@@ -478,13 +478,13 @@ def update_stores():
     save_settings(s)
 
 
-def fetch_city(city, auto=False):
+def fetch_city(city, auto=False, stores=None):
     JOB["city"] = city
     if auto:
         log(f"עדכון אוטומטי של {city}")
     if not load_stores():
         update_stores()
-    stores = city_stores(city)
+    stores = city_stores(city) if stores is None else stores
     if not stores:
         raise RuntimeError(f'לא נמצאו סניפים בעיר "{city}". נסו לעדכן את רשימת הסניפים או לבחור שם אחר מהרשימה.')
     by_scraper = {}
@@ -508,7 +508,7 @@ def fetch_city(city, auto=False):
         got = [p.name for p in (DUMPS / folder).glob("*") if p.name.lower().startswith("pricefull")] if folder else []
         pr = [p.name for p in (DUMPS / folder).glob("*") if p.name.lower().startswith("promofull")] if folder else []
         log(f"   קבצי מחירים: {len(got)}, קבצי מבצעים: {len(pr)} {pr[:2]}")
-    d = city_data(city)
+    d = city_data(city, stores)
     log(f"מוכן: {len(d['items']):,} מוצרים מ-{d['stores_with_prices']} סניפים")
     s = load_settings()
     if city not in s["cities"]:

@@ -6,6 +6,8 @@ on:
   workflow_run:
     workflows: ["מחירים מישראל"]
     types: [completed]
+  issues:                     # בקשה מהאפליקציה: issue בשם "עיר: נס ציונה | 10"
+    types: [opened]
   workflow_dispatch:
     inputs:
       city:
@@ -16,6 +18,7 @@ on:
 permissions:
   actions: read
   contents: write
+  issues: write
   pages: write
   id-token: write
 
@@ -25,6 +28,8 @@ concurrency:
 
 jobs:
   build:
+    # issue רק מבעל המאגר ורק בפורמט "עיר: ..."
+    if: github.event_name != 'issues' || (startsWith(github.event.issue.title, 'עיר:') && github.event.issue.user.login == github.repository_owner)
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -36,6 +41,15 @@ jobs:
         run: |
           pip install -U il-supermarket-scraper
           python -m playwright install --with-deps chromium || true
+      - name: בקשה מהאפליקציה (עיר חדשה / רדיוס)
+        if: github.event_name == 'issues'
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          city=$(python3 -c "import os;print(os.environ['ISSUE_TITLE'].split(':',1)[1].strip())")
+          echo "NEW_CITY=$city" >> "$GITHUB_ENV"
+          echo "ONLY_NEW=1" >> "$GITHUB_ENV"
+          git fetch -q --depth 1 origin data && mkdir -p prev && git --work-tree=prev checkout origin/data -- . && git reset -q || true
       - name: נתונים מהמחשב בבית (רשתות שחסומות מחו"ל)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,14 +60,14 @@ jobs:
       - name: שאיבת מחירים ובניית האתר
         env:
           SKIP_CHAINS: HAZI_HINAM,VICTORY_NEW_SOURCE,YAYNO_BITAN_AND_CARREFOUR,MAHSANI_ASHUK_NEW_SOURCE,SUPER_PHARM,NETIV_HASED,HET_COHEN_NEW_SOURCE
-          NEW_CITY: ${{ github.event.inputs.city }}
+          NEW_CITY: ${{ github.event.inputs.city || env.NEW_CITY }}
         run: python build.py
       - name: שמירת רשימת הערים
         run: |
           git config user.name "prices-bot"
           git config user.email "prices-bot@users.noreply.github.com"
-          git add cities.txt
-          git diff --cached --quiet || (git commit -m "הוספת עיר" && git push)
+          git add cities.txt geo_cache.json
+          git diff --cached --quiet || (git commit -qm "עדכון ערים ומיקומים" && git pull -q --rebase && git push -q)
       - name: עותק נתונים בענף data
         run: |
           cd site
@@ -74,3 +88,15 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  notify:
+    needs: deploy
+    if: always() && github.event_name == 'issues' && needs.deploy.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ needs.deploy.result }}
+        run: |
+          if [ "$RESULT" = "success" ]; then msg="✅ מוכן – פתחו את האפליקציה מחדש."; else msg="❌ משהו נכשל. פרטים: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"; fi
+          gh issue close ${{ github.event.issue.number }} -R ${{ github.repository }} -c "$msg"

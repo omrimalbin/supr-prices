@@ -77,6 +77,9 @@ textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12
 .rm{font:inherit;border:0;background:none;color:var(--muted);font-size:18px;padding:4px 6px}
 .addbtn{font:inherit;font-weight:600;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:10px 16px;white-space:nowrap}
 details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 0}
+.chip.more{border-style:dashed;color:var(--muted)}
+#addCity{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 10px;margin-top:8px}
+.pend{font-size:13px;color:#b25e00;margin-top:6px}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
@@ -87,6 +90,16 @@ h3{font-size:16px;margin:14px 0 8px}
   <h1>מחירי סופר</h1>
   <div class="tabs"><span class="tab on" data-t="prod">חיפוש מוצרים</span><span class="tab" data-t="basket">רשימת קניות</span></div>
   <div class="row"><select id="city"></select></div>
+  <div class="chips" id="area"></div>
+  <div id="addCity" hidden>
+    <div class="row" style="margin-top:8px"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off"></div>
+    <datalist id="allCities"></datalist>
+    <div class="row" style="margin-top:6px"><select id="newRadius">
+      <option value="0">רק סניפים בעיר</option><option value="3">כולל סניפים עד 3 ק"מ</option><option value="5">כולל סניפים עד 5 ק"מ</option>
+      <option value="10">כולל סניפים עד 10 ק"מ</option><option value="15">כולל סניפים עד 15 ק"מ</option></select>
+      <button class="addbtn" id="newCityBtn">שאיבה</button></div>
+    <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע ברשימה כשתהיה מוכנה.</div>
+  </div>
   <div class="prodOnly" style="margin-top:8px"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"></div>
   <div class="chips prodOnly" id="sorts">
     <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
@@ -121,26 +134,81 @@ let meta=null,data=null,sort=LS.get('sort','name'),shown=60;
 
 function ago(t){const m=Math.round((Date.now()/1000-t)/60);return m<1?"עכשיו":m<60?`לפני ${m} דקות`:m<1440?`לפני ${Math.round(m/60)} שעות`:`לפני ${Math.round(m/1440)} ימים`;}
 
+const pending=JSON.parse(LS.get('pending','{}'));      // עיר -> {radius, at}
+const AREAS=[0,3,5,10,15];
+const issueUrl=(name,r)=>`https://github.com/${meta.repo}/issues/new?title=${encodeURIComponent('עיר: '+name+(r?' | '+r:''))}&body=${encodeURIComponent('בקשה מהאפליקציה. לחצו "Submit new issue" – השאיבה תתחיל לבד ברקע, וה-issue ייסגר כשהעיר מוכנה.')}`;
+function cityOptions(){
+  const have=new Set(meta.cities.map(c=>c.name));
+  for(const n in pending) if(have.has(n)&&(meta.cities.find(c=>c.name===n).updated||0)>pending[n].at/1000) delete pending[n];
+  LS.set('pending',JSON.stringify(pending));
+  const pend=Object.keys(pending).filter(n=>!have.has(n)||pending[n].radius!=null);
+  return meta.cities.map(c=>`<option value="${c.slug}">${esc(c.name)}${c.items?` (${c.with_prices} סניפים)`:''}${pending[c.name]?' ⏳':''}</option>`).join('')
+    +pend.filter(n=>!have.has(n)).map(n=>`<option value="" disabled>⏳ ${esc(n)} – בהכנה…</option>`).join('')
+    +(meta.repo?'<option value="__add">➕ עיר אחרת…</option>':'');
+}
 async function init(){
   meta=await (await fetch('data/cities.json?'+Date.now())).json();
   if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
   else $('#refresh').hidden=true;
   setTab(tab);
-  $('#city').innerHTML=meta.cities.map(c=>`<option value="${c.slug}">${esc(c.name)}${c.items?` (${c.with_prices} סניפים)`:''}</option>`).join('');
+  $('#city').innerHTML=cityOptions();
+  $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
   const saved=LS.get('city','');if(meta.cities.some(c=>c.slug===saved))$('#city').value=saved;
   document.querySelectorAll('#sorts .chip').forEach(ch=>{ch.classList.toggle('on',ch.dataset.s===sort);ch.onclick=()=>{sort=ch.dataset.s;LS.set('sort',sort);document.querySelectorAll('#sorts .chip').forEach(x=>x.classList.toggle('on',x===ch));shown=60;draw();};});
   await loadCity();
 }
-async function loadCity(){
-  const c=meta.cities.find(x=>x.slug===$('#city').value);LS.set('city',c.slug);
-  $('#meta').textContent=`עודכן ${ago(meta.updated)}`;
-  if(c.error){data=null;$('#list').innerHTML=`<div class="err">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף אותה דרך הכפתור למטה.</span>`:''}</div>`;return;}
-  $('#list').innerHTML='<div class="muted">טוען…</div>';
-  data=await (await fetch(`data/${c.slug}.json?`+Math.floor(meta.updated))).json();
-  for(const it of data.items){const p=it[3];it.min=p[0][1];it.max=p[p.length-1][1];it.n=p.length;}
-  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים · עודכן ${ago(meta.updated)}`;
+// ---- עיר חדשה / אזור: נשאבים ברקע ב-GitHub ----
+function requestCity(name,r){
+  name=name.trim(); if(!name)return;
+  pending[name]={radius:r,at:Date.now()}; LS.set('pending',JSON.stringify(pending));
+  window.open(issueUrl(name,r),'_blank');
+  $('#addMsg').innerHTML=`נפתח GitHub – לחצו שם <b>Submit new issue</b>. אחרי זה "${esc(name)}" תישאב ברקע (כ-10–20 דקות), ואפשר להמשיך להשתמש באפליקציה. העיר תתעדכן כאן לבד.`;
+  $('#city').innerHTML=cityOptions(); const c=meta.cities.find(x=>x.name===curCityName); if(c)$('#city').value=c.slug;
+}
+$('#newCityBtn').onclick=()=>requestCity($('#newCity').value,+$('#newRadius').value);
+setInterval(async()=>{   // בודק אם עיר שבהכנה כבר מוכנה
+  if(!Object.keys(pending).length||!meta)return;
+  try{const m=await (await fetch('data/cities.json?'+Date.now())).json();
+    if(m.updated>meta.updated){meta=m;const cur=$('#city').value;$('#city').innerHTML=cityOptions();
+      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
+      if(meta.cities.some(c=>c.slug===cur)){$('#city').value=cur;await loadCity();}}}catch(e){}
+},60000);
+let rawData=null,curCityName='';
+function areaOf(c){const v=LS.get('area:'+c.name,null);return v==null?(c.radius||0):Math.min(+v,c.radius||0);}
+function drawArea(c){
+  const r=c.radius||0, cur=areaOf(c);
+  $('#area').innerHTML=[...new Set([...AREAS,r])].sort((x,y)=>x-y).map(a=>a<=r?`<span class="chip ${a===cur?'on':''}" data-a="${a}">${a?'עד '+a+' ק"מ':'בעיר בלבד'}</span>`
+    :(meta.repo?`<span class="chip more" data-req="${a}">+ ${a} ק"מ</span>`:'')).join('')
+    +(pending[c.name]&&pending[c.name].radius>r?`<span class="pend">⏳ אזור ${pending[c.name].radius} ק"מ בהכנה…</span>`:'');
+  document.querySelectorAll('#area [data-a]').forEach(x=>x.onclick=()=>{LS.set('area:'+c.name,x.dataset.a);applyArea(c);});
+  document.querySelectorAll('#area [data-req]').forEach(x=>x.onclick=()=>{
+    const a=+x.dataset.req; if(confirm(`לשאוב גם סניפים עד ${a} ק"מ מ${c.name}? זה רץ ברקע ב-GitHub (כ-10–20 דקות).`)){LS.set('area:'+c.name,a);requestCity(c.name,a);drawArea(c);}});
+}
+function viewData(raw,r){   // רק סניפים בטווח שנבחר
+  const keep=[],map={};
+  raw.stores.forEach((st,i)=>{if((st[3]||0)<=r+1e-9){map[i]=keep.length;keep.push(st);}});
+  const items=[];
+  for(const it of raw.items){const p=it[3].filter(e=>e[0] in map).map(e=>[map[e[0]],...e.slice(1)]);
+    if(p.length){const x=[it[0],it[1],it[2],p,it[4],it[5]];x.min=p[0][1];x.max=p[p.length-1][1];x.n=p.length;items.push(x);}}
+  return {stores:keep,items,promos:raw.promos};
+}
+function applyArea(c){
+  const r=areaOf(c); data=viewData(rawData,r); drawArea(c);
+  const near=data.stores.filter(s=>(s[3]||0)>0).length;
+  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${near?` (${near} באזור)`:''} · עודכן ${ago(c.updated||meta.updated)}`;
   shown=60;draw();
   lastRes=null;selStore=null;if(tab==='basket'&&$('#blist').value.trim())runBasket();
+}
+async function loadCity(){
+  if($('#city').value==='__add'){$('#addCity').hidden=false;$('#newCity').focus();
+    const c=meta.cities.find(x=>x.name===curCityName)||meta.cities[0];if(c)$('#city').value=c.slug;return;}
+  $('#addCity').hidden=true;
+  const c=meta.cities.find(x=>x.slug===$('#city').value);LS.set('city',c.slug);curCityName=c.name;
+  $('#meta').textContent=`עודכן ${ago(meta.updated)}`;
+  if(c.error){data=null;$('#area').innerHTML='';$('#list').innerHTML=`<div class="err">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף דרך "➕ עיר אחרת".</span>`:''}</div>`;return;}
+  $('#list').innerHTML='<div class="muted">טוען…</div>';
+  rawData=await (await fetch(`data/${c.slug}.json?`+Math.floor(c.updated||meta.updated))).json();
+  applyArea(c);
 }
 function filtered(){
   const q=$('#q').value.trim().toLowerCase();
@@ -247,7 +315,7 @@ function runBasket(){
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
   let h='<h3>השוואה בין הסניפים</h3>';
   h+=res.stores.map((s,i)=>`<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}">
-     <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
+     <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}${(data.stores[s.si][3]||0)>0?`<div class="sub">📍 ${data.stores[s.si][3]} ק"מ מהעיר</div>`:''}
      <div class="sub ${s.found<n?'miss':''}">${s.found===n?'כל הפריטים קיימים':`חסרים ${n-s.found} מתוך ${n} פריטים`}</div>
      ${s.rows.some(r=>r&&r.promo)?`<div class="promo">🏷️ כולל ${s.rows.filter(r=>r&&r.promo).length} מבצעים</div>`:''}
      ${staleTxt(s.si)?`<div class="sub">${staleTxt(s.si)}</div>`:''}

@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import prices_app as A
+import geo
 
 ROOT = Path(__file__).resolve().parent
 SITE = ROOT / "site"
@@ -72,24 +73,55 @@ def slug(city):
     return hashlib.md5(city.encode("utf-8")).hexdigest()[:10]
 
 
+DEFAULT_RADIUS = 0
+
+
+def parse_city_line(line):
+    """"נס ציונה | 10" -> ("נס ציונה", 10)"""
+    name, _, r = (line or "").partition("|")
+    try:
+        radius = max(0, min(30, float(r.strip()))) if r.strip() else DEFAULT_RADIUS
+    except ValueError:
+        radius = DEFAULT_RADIUS
+    return A.norm_city(name), radius
+
+
 def read_cities():
-    out = []
+    out = {}
     for line in CITIES_FILE.read_text(encoding="utf-8").splitlines():
-        c = A.norm_city(line)
-        if c and not c.startswith("#") and c not in out:
-            out.append(c)
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        c, r = parse_city_line(line)
+        if c:
+            out[c] = r
     return out
 
 
-def make_city(c):
-    """שואב עיר ומחזיר את נתוני האפליקציה: סניפים, מוצרים ומבצעים."""
-    A.fetch_city(c)
-    d = A.city_data(c)
+def write_cities(cities):
+    lines = ["# ערים למעקב – עיר בכל שורה. אפשר להוסיף רדיוס בק\"מ: נס ציונה | 10"]
+    lines += [f"{c} | {r:g}" if r else c for c, r in cities.items()]
+    CITIES_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def make_city(c, radius=0):
+    """שואב עיר (+ סניפים ביישובים סמוכים עד radius ק"מ) ומחזיר: סניפים, מוצרים ומבצעים."""
+    if not A.load_stores():
+        A.update_stores()
+    own = A.city_stores(c)
+    near = geo.nearby_stores(c, radius, exclude=own) if radius else []
+    area = own + [s for s, _ in near]
+    if not area:
+        raise RuntimeError(f'לא נמצאו סניפים בעיר "{c}"')
+    dist = {(s["chain"], s["store"]): 0 for s in own}
+    dist.update({(s["chain"], s["store"]): d for s, d in near})
+    print(f"{c}: {len(own)} סניפים בעיר + {len(near)} באזור (עד {radius:g} ק\"מ)")
+    A.fetch_city(c, stores=area)
+    d = A.city_data(c, area)
     now = round(time.time())
     stores, idx, items = [], {}, {}
     promo_by_store, descs, desc_idx = {}, [], {}
     npromo = 0
-    for st in A.city_stores(c):
+    for st in area:
         pf = A.price_file_for(st["folder"], st["store"], "promofull")
         if pf:
             try:
@@ -106,7 +138,7 @@ def make_city(c):
         k = (r["chain"], r["store"])
         if k not in idx:
             idx[k] = len(stores)
-            stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now])
+            stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now, dist.get(k, 0)])
         it = items.get(r["barcode"])
         if it is None:
             size, unit = parse_size(r)
@@ -132,7 +164,7 @@ def make_city(c):
             npromo += 1
         it[3].append(pe)
     return {"stores": stores, "items": list(items.values()), "promos": descs,
-            "n_city_stores": len(A.city_stores(c)), "n_promo": npromo}
+            "n_city_stores": len(area), "n_promo": npromo}
 
 
 def merge(base, extra):
@@ -185,15 +217,22 @@ def load_israel():
 
 def main():
     cities = read_cities()
-    new = A.norm_city(os.environ.get("NEW_CITY", ""))
-    if new and new not in cities:
-        cities.append(new)
-        with open(CITIES_FILE, "a", encoding="utf-8") as f:
-            f.write(new + "\n")
+    new = os.environ.get("NEW_CITY", "").strip()
+    only = None
+    if new:
+        c, r = parse_city_line(new)
+        if c:
+            cities[c] = r
+            write_cities(cities)
+            if os.environ.get("ONLY_NEW"):
+                only = c                      # שאיבה של העיר החדשה בלבד; השאר נשארים מהעדכון הקודם
 
     A.update_stores()
-    all_cities = A.city_names()
     israel = load_israel()
+    prev = Path(os.environ.get("PREV", "prev"))
+    prev_meta = {}
+    if only and (prev / "data" / "cities.json").exists():
+        prev_meta = {m["name"]: m for m in json.loads((prev / "data" / "cities.json").read_text(encoding="utf-8"))["cities"]}
 
     if SITE.exists():
         shutil.rmtree(SITE)
@@ -201,12 +240,24 @@ def main():
     for f in (ROOT / "web").iterdir():   # הדף + קובצי האפליקציה (אייקונים, manifest, sw.js)
         shutil.copy(f, SITE / f.name)
 
+    all_cities = {}
+    for s_ in A.load_stores():
+        n = geo.store_city(s_)
+        if n:
+            all_cities[n] = all_cities.get(n, 0) + 1
+
     meta = []
-    for c in cities:
-        entry = {"name": c, "slug": slug(c)}
+    for c, radius in cities.items():
+        entry = {"name": c, "slug": slug(c), "radius": radius}
+        if only and c != only and c in prev_meta:          # עיר קיימת – מעתיקים כמו שהיא
+            pf = prev / "data" / f"{entry['slug']}.json"
+            if pf.exists():
+                shutil.copy(pf, SITE / "data" / pf.name)
+                meta.append(prev_meta[c])
+                continue
         data, err = None, None
         try:
-            data = make_city(c)
+            data = make_city(c, radius)
         except Exception as e:  # noqa
             err = str(e)
         if c in israel:
@@ -216,12 +267,13 @@ def main():
             (SITE / "data" / f"{entry['slug']}.json").write_text(
                 json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
             entry.update(stores=data["n_city_stores"], with_prices=len(data["stores"]),
-                         items=len(data["items"]), promos=data["n_promo"])
+                         items=len(data["items"]), promos=data["n_promo"], updated=time.time())
             print(f"{c}: {len(data['items'])} מוצרים מ-{len(data['stores'])} סניפים, {data['n_promo']} מחירים עם מבצע")
         else:
             entry["error"] = err or "לא נמצאו מחירים"
             entry["suggestions"] = difflib.get_close_matches(c, list(all_cities), n=5, cutoff=0.5)
         meta.append(entry)
+    geo.save()
 
     (SITE / "data" / "stores.json").write_text(json.dumps(
         [[s["chain"], s["store"], s["sname"], s["city"], s["address"]] for s in A.load_stores()],

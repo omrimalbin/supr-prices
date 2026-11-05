@@ -22,9 +22,9 @@ def main():
     cities = build.read_cities()
     A.update_stores()
     result = {}
-    for c in cities:
+    for c, radius in cities.items():
         try:
-            data = build.make_city(c)
+            data = build.make_city(c, radius)
             result[c] = data
             print(f"{c}: {len(data['stores'])} סניפים, {len(data['items'])} מוצרים")
         except Exception as e:  # noqa
