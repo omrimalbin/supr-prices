@@ -81,6 +81,108 @@ def read_cities():
     return out
 
 
+def make_city(c):
+    """שואב עיר ומחזיר את נתוני האפליקציה: סניפים, מוצרים ומבצעים."""
+    A.fetch_city(c)
+    d = A.city_data(c)
+    now = round(time.time())
+    stores, idx, items = [], {}, {}
+    promo_by_store, descs, desc_idx = {}, [], {}
+    npromo = 0
+    for st in A.city_stores(c):
+        pf = A.price_file_for(st["folder"], st["store"], "promofull")
+        if pf:
+            try:
+                promo_by_store[(st["chain"], st["store"])] = A.parse_promos(pf)
+            except Exception as e:  # noqa
+                print("promo parse failed", pf.name, e)
+    for r in d["full"]:
+        try:
+            pr = float(r["price"])
+        except ValueError:
+            continue
+        if pr <= 0 or not r["barcode"]:
+            continue
+        k = (r["chain"], r["store"])
+        if k not in idx:
+            idx[k] = len(stores)
+            stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now])
+        it = items.get(r["barcode"])
+        if it is None:
+            size, unit = parse_size(r)
+            it = items[r["barcode"]] = [r["barcode"], r["name"], r["manu"], [], size, unit]
+        if not it[1]:
+            it[1] = r["name"]
+        pe = [idx[k], round(pr, 2)]
+        offers = {}
+        for mq, bundle, rate, desc in promo_by_store.get(k, {}).get(r["barcode"], []):
+            if bundle is None:
+                bundle = mq * pr * (1 - rate / 100)
+            unit = bundle / mq
+            if not (0.15 * pr <= unit < pr * 0.995):
+                continue                      # לא הגיוני / לא באמת הנחה
+            key = round(mq, 3)
+            if key not in offers or bundle < offers[key][1]:
+                if desc not in desc_idx:
+                    desc_idx[desc] = len(descs)
+                    descs.append(desc)
+                offers[key] = [key, round(bundle, 2), desc_idx[desc]]
+        if offers:
+            pe.append(sorted(offers.values())[:3])
+            npromo += 1
+        it[3].append(pe)
+    return {"stores": stores, "items": list(items.values()), "promos": descs,
+            "n_city_stores": len(A.city_stores(c)), "n_promo": npromo}
+
+
+def merge(base, extra):
+    """מוסיף לעיר סניפים ממקור נוסף (המחשב בבית). base יכול להיות None."""
+    if not base:
+        base = {"stores": [], "items": [], "promos": [], "n_city_stores": 0, "n_promo": 0}
+    have = {(s[0], s[1]) for s in base["stores"]}
+    s_off, p_off = len(base["stores"]), len(base["promos"])
+    keep = [i for i, s in enumerate(extra["stores"]) if (s[0], s[1]) not in have]
+    remap = {old: s_off + n for n, old in enumerate(keep)}
+    base["stores"] += [extra["stores"][i] for i in keep]
+    base["promos"] += extra["promos"]
+    by_code = {it[0]: it for it in base["items"]}
+    for it in extra["items"]:
+        prices = []
+        for pe in it[3]:
+            if pe[0] not in remap:
+                continue
+            pe = [remap[pe[0]], pe[1]] + ([[[o[0], o[1], o[2] + p_off] for o in pe[2]]] if len(pe) > 2 else [])
+            prices.append(pe)
+        if not prices:
+            continue
+        cur = by_code.get(it[0])
+        if cur is None:
+            cur = by_code[it[0]] = [it[0], it[1], it[2], [], it[4], it[5]]
+            base["items"].append(cur)
+        cur[3] += prices
+        cur[3].sort(key=lambda x: x[1])
+    base["n_city_stores"] += len(keep)
+    base["n_promo"] += extra.get("n_promo", 0)
+    return base
+
+
+def load_israel():
+    """נתונים מהמחשב בבית (אם הורדו לתיקייה israel/ ע"י ה-workflow), עד 14 יום אחורה."""
+    f = ROOT / "israel" / "israel.json"
+    if not f.exists():
+        return {}
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except Exception:  # noqa
+        return {}
+    if time.time() - d.get("updated", 0) > 14 * 86400:
+        print("נתוני הבית ישנים מדי – לא נכללים")
+        return {}
+    print("נתוני הבית מ-", time.strftime("%Y-%m-%d %H:%M", time.gmtime(d["updated"])), "UTC:",
+          {c: len(v["stores"]) for c, v in d["cities"].items()})
+    return d["cities"]
+
+
 def main():
     cities = read_cities()
     new = A.norm_city(os.environ.get("NEW_CITY", ""))
@@ -90,20 +192,8 @@ def main():
             f.write(new + "\n")
 
     A.update_stores()
-    if os.environ.get("DIAG"):
-        from collections import Counter, defaultdict
-        st = A.load_stores()
-        print("DIAG total", len(st))
-        per = defaultdict(Counter)
-        for s in st:
-            per[s["chain"]][s["city"]] += 1
-        for ch, cnt in per.items():
-            print("DIAG chain", ch, len(sum(cnt.values() and [cnt], Counter())), list(cnt.most_common(6)))
-        for s in st:
-            blob = " ".join([s["city"], s["sname"], s["address"]])
-            if "ציונ" in blob or "ness" in blob.lower():
-                print("DIAG match", s)
     all_cities = A.city_names()
+    israel = load_israel()
 
     if SITE.exists():
         shutil.rmtree(SITE)
@@ -114,64 +204,22 @@ def main():
     meta = []
     for c in cities:
         entry = {"name": c, "slug": slug(c)}
+        data, err = None, None
         try:
-            A.fetch_city(c)
-            d = A.city_data(c)
-            stores, idx, items = [], {}, {}
-            # מבצעים לכל סניף
-            promo_by_store, descs, desc_idx = {}, [], {}
-            npromo = 0
-            for st in A.city_stores(c):
-                pf = A.price_file_for(st["folder"], st["store"], "promofull")
-                if pf:
-                    try:
-                        promo_by_store[(st["chain"], st["store"])] = A.parse_promos(pf)
-                    except Exception as e:  # noqa
-                        print("promo parse failed", pf.name, e)
-            for r in d["full"]:
-                try:
-                    pr = float(r["price"])
-                except ValueError:
-                    continue
-                if pr <= 0 or not r["barcode"]:
-                    continue
-                k = (r["chain"], r["store"])
-                if k not in idx:
-                    idx[k] = len(stores)
-                    stores.append([r["chain"], r["sname"] or "סניף " + r["store"]])
-                it = items.get(r["barcode"])
-                if it is None:
-                    size, unit = parse_size(r)
-                    it = items[r["barcode"]] = [r["barcode"], r["name"], r["manu"], [], size, unit]
-                if not it[1]:
-                    it[1] = r["name"]
-                pe = [idx[k], round(pr, 2)]
-                offers = {}
-                for mq, bundle, rate, desc in promo_by_store.get(k, {}).get(r["barcode"], []):
-                    if bundle is None:
-                        bundle = mq * pr * (1 - rate / 100)
-                    unit = bundle / mq
-                    if not (0.15 * pr <= unit < pr * 0.995):
-                        continue                      # לא הגיוני / לא באמת הנחה
-                    key = round(mq, 3)
-                    if key not in offers or bundle < offers[key][1]:
-                        if desc not in desc_idx:
-                            desc_idx[desc] = len(descs)
-                            descs.append(desc)
-                        offers[key] = [key, round(bundle, 2), desc_idx[desc]]
-                if offers:
-                    pe.append(sorted(offers.values())[:3])
-                    npromo += 1
-                it[3].append(pe)
-            for it in items.values():
-                it[3].sort(key=lambda x: x[1])
-            (SITE / "data" / f"{entry['slug']}.json").write_text(
-                json.dumps({"stores": stores, "items": list(items.values()), "promos": descs}, ensure_ascii=False,
-                           separators=(",", ":")), encoding="utf-8")
-            entry.update(stores=len(A.city_stores(c)), with_prices=len(stores), items=len(items), promos=npromo)
-            print(f"{c}: {len(items)} מוצרים, {npromo} מחירים עם מבצע, {len(descs)} מבצעים")
+            data = make_city(c)
         except Exception as e:  # noqa
-            entry["error"] = str(e)
+            err = str(e)
+        if c in israel:
+            data = merge(data, israel[c])
+        if data and data["stores"]:
+            out = {k: data[k] for k in ("stores", "items", "promos")}
+            (SITE / "data" / f"{entry['slug']}.json").write_text(
+                json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            entry.update(stores=data["n_city_stores"], with_prices=len(data["stores"]),
+                         items=len(data["items"]), promos=data["n_promo"])
+            print(f"{c}: {len(data['items'])} מוצרים מ-{len(data['stores'])} סניפים, {data['n_promo']} מחירים עם מבצע")
+        else:
+            entry["error"] = err or "לא נמצאו מחירים"
             entry["suggestions"] = difflib.get_close_matches(c, list(all_cities), n=5, cutoff=0.5)
         meta.append(entry)
 

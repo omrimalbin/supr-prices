@@ -1,0 +1,37 @@
+name: מחירים מישראל
+
+# רץ על המחשב בבית (self-hosted runner עם התווית israel).
+# כשהמחשב כבוי – ההרצה ממתינה בתור עד שיידלק (או מתבטלת אחרי 24 שעות, בלי נזק).
+on:
+  schedule:
+    - cron: "45 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: israel
+  cancel-in-progress: true
+
+jobs:
+  scrape:
+    runs-on: [self-hosted, israel]
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - name: הכנת Python
+        shell: cmd
+        run: |
+          if not defined PRICES_PYTHON set PRICES_PYTHON=py -3
+          if not exist "%RUNNER_TOOL_CACHE%\pricesvenv\Scripts\python.exe" %PRICES_PYTHON% -m venv "%RUNNER_TOOL_CACHE%\pricesvenv"
+          "%RUNNER_TOOL_CACHE%\pricesvenv\Scripts\python.exe" -m pip install -q -U pip il-supermarket-scraper
+          "%RUNNER_TOOL_CACHE%\pricesvenv\Scripts\python.exe" -m playwright install chromium || ver > nul
+      - name: שאיבת הרשתות החסרות
+        shell: cmd
+        run: '"%RUNNER_TOOL_CACHE%\pricesvenv\Scripts\python.exe" israel.py'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: israel-data
+          path: israel/israel.json
+          retention-days: 30

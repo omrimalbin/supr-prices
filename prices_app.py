@@ -15,6 +15,7 @@ import csv
 import gzip
 import io
 import json
+import os
 import re
 import socket
 import sys
@@ -450,9 +451,24 @@ def scheduler():
 
 
 # ================================================================ פעולות
-def update_stores():
+# רשתות שחוסמות גישה מחוץ לישראל – נשאבות מהמחשב בבית (israel.py)
+ISRAEL_CHAINS = ["HAZI_HINAM", "VICTORY_NEW_SOURCE", "YAYNO_BITAN_AND_CARREFOUR", "MAHSANI_ASHUK_NEW_SOURCE",
+                 "SUPER_PHARM", "NETIV_HASED", "HET_COHEN_NEW_SOURCE"]
+
+
+def active_scrapers():
+    """אילו רשתות לשאוב כאן: ONLY_CHAINS / SKIP_CHAINS (משתני סביבה, מופרדים בפסיק)."""
     _, SF, _ = lib()
     names = SF.all_scrapers_name()
+    only = [x for x in os.environ.get("ONLY_CHAINS", "").split(",") if x]
+    skip = [x for x in os.environ.get("SKIP_CHAINS", "").split(",") if x]
+    if only:
+        names = [n for n in names if n in only]
+    return [n for n in names if n not in skip]
+
+
+def update_stores():
+    names = active_scrapers()
     log(f"מוריד את רשימות הסניפים מ-{len(names)} רשתות (זה לוקח כמה דקות)...")
     run_scrape(names, "STORE_FILE")
     st = load_stores()
