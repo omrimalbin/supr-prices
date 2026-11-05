@@ -272,6 +272,8 @@ function setTab(t){tab=t;LS.set('tab',t);
 document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>setTab(x.dataset.t));
 $('#blist').value=LS.get('blist','');
 $('#blist').oninput=()=>{LS.set('blist',$('#blist').value);renderItems();};
+$('#blist').addEventListener('paste',()=>setTimeout(()=>{$('#blist').value=cleanText($('#blist').value);LS.set('blist',$('#blist').value);renderItems();},0));
+$('#blist').addEventListener('blur',()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}});
 // ---- עריכת הרשימה: הוספה, הסרה, כמות ----
 function splitLine(l){                      // "לחם x2" -> {name:"לחם", qty:2}
   let m=l.match(/^(.*?)\s*[x×*]\s*(\d+)\s*$/i)||l.match(/^(.*?\D)\s+(\d{1,2})\s*$/);
@@ -306,7 +308,7 @@ $('#bclear').onclick=()=>{
 };
 let showAllStores=false;
 function addItem(){
-  const v=$('#badd').value.trim(); if(!v)return;
+  const v=cleanLine($('#badd').value); if(!v){$('#badd').value='';return;}
   const ls=lines(), {name,qty}=splitLine(v), k=keyOf(v);
   const j=ls.findIndex(l=>keyOf(l)===k);
   if(j>=0){ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty);} else ls.push(joinLine(name,qty));
@@ -314,8 +316,29 @@ function addItem(){
 }
 $('#baddBtn').onclick=addItem;
 $('#badd').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addItem();}};
+$('#badd').addEventListener('paste',e=>{     // הדבקת רשימה שלמה לשדה ההוספה
+  const t=(e.clipboardData||window.clipboardData).getData('text'); if(!/\n/.test(t)) return;
+  e.preventDefault(); const ls=lines();
+  for(const raw of t.split(/\r?\n/)){const v=cleanLine(raw); if(!v) continue;
+    const {name,qty}=splitLine(v), k=keyOf(v), j=ls.findIndex(l=>keyOf(l)===k);
+    if(j>=0) ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty); else ls.push(joinLine(name,qty));}
+  setLines(ls);
+});
 $('#bgo').onclick=()=>{selStore=null;runBasket();setTimeout(()=>$('#bres').scrollIntoView({behavior:'smooth'}),50);};
-const lines=()=>$('#blist').value.split('\n').map(l=>l.trim()).filter(Boolean);
+// ניקוי שורה מרשימה מודבקת: תבליטים, מספור, אמוג'י, "× 1"; כותרות קטגוריה ("ירקות:") נמחקות
+function cleanLine(l){
+  l=String(l||'').replace(/[‎‏‪-‮]/g,'').trim();
+  if(!l) return '';
+  if(/[:：]\s*$/.test(l)) return '';                                   // כותרת קטגוריה
+  l=l.replace(/^[\s•●○◦▪▫■□►▸‣⁃∙·*\-–—✓✔☐☑✅🔲⬜️]+/u,'')               // תבליטים
+     .replace(/^\(?\d{1,2}[.)]\s+/,'')                                  // מספור "1." / "1)"
+     .replace(/^\[[ xX]?\]\s*/,'')                                      // תיבות סימון
+     .replace(/\s*[×xX*]\s*1\s*$/,'')                                   // "× 1" מיותר
+     .trim();
+  return /[\p{L}]/u.test(l)?l:'';
+}
+const cleanText=t=>t.split(/\r?\n/).map(cleanLine).filter(Boolean).join('\n');
+const lines=()=>$('#blist').value.split('\n').map(cleanLine).filter(Boolean);
 const keyOf=l=>Match.parseLine(l).text;
 function sizeTxt(it){return it[5]==='kg'?'לק"ג':it[4]>0?(it[5]==='u'?it[4]+' יח\'':it[4]>=1000?(it[4]/1000)+(it[5]==='ml'?' ל\'':' ק"ג'):it[4]+(it[5]==='ml'?' מ"ל':' גרם')):'';}
 function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return it[5]==='u'?`${nis(u)} ליח'`:it[5]==='ml'?`${nis(u)} לליטר`:`${nis(u)} לק"ג`;}
