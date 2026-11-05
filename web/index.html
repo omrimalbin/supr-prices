@@ -94,6 +94,10 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .pinq{font-size:12px;color:var(--accent)}.pinq a{color:var(--muted)}
 .pinbox{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:10px;background:var(--soft);border-radius:10px;padding:8px 10px}
 .pinbox input{width:auto;margin-top:3px}
+#toast{position:fixed;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));z-index:30;max-width:680px;margin:0 auto;
+  display:flex;gap:8px;align-items:flex-start;background:var(--accent);color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:15px;line-height:1.5}
+#toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
+@media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
@@ -134,6 +138,7 @@ h3{font-size:16px;margin:14px 0 8px}
   <div id="bres"></div>
 </main>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
+<div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
 <a class="fab" id="refresh" target="_blank" rel="noopener">רענון עכשיו / הוספת עיר</a>
 <script src="match.js"></script>
 <script>
@@ -168,6 +173,7 @@ async function init(){
   if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
   else $('#refresh').hidden=true;
   setTab(tab);
+  updateNotes();
   selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
   if(!selCities.length&&meta.cities.length) selCities=[meta.cities[0].slug];
   drawCities();
@@ -186,11 +192,39 @@ function requestCity(name){
 }
 $('#newCityBtn').onclick=()=>requestCity($('#newCity').value);
 $('#newCity').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();requestCity($('#newCity').value);}};
-setInterval(async()=>{   // עיר שבהכנה מוכנה? מוסיפים אותה לרשימה
-  if(!Object.keys(pending).length||!meta)return;
-  try{const m=await (await fetch('data/cities.json?'+Date.now())).json();
+// ---- הודעה על עדכונים שהסתיימו ----
+function notify(html,onTap){
+  $('#tmsg').innerHTML=html; $('#toast').hidden=false;
+  $('#tmsg').onclick=()=>{$('#toast').hidden=true; if(onTap) onTap();};
+}
+$('#tclose').onclick=()=>$('#toast').hidden=true;
+const notes=[];            // הודעות שנאספו בפתיחה
+function updateNotes(){    // עיר חדשה + עדכון מחירים מאז הביקור הקודם
+  const seenAt=+LS.get('seenUpdate',0), seenCities=JSON.parse(LS.get('seenCities','null')||'null');
+  if(seenCities){ const nw=meta.cities.filter(c=>!c.error&&!seenCities.includes(c.name)).map(c=>c.name);
+    if(nw.length) notes.push(`🏙️ נוספה ${nw.length>1?'ערים':'עיר'}: <b>${nw.map(esc).join(', ')}</b>`); }
+  if(seenAt&&meta.updated>seenAt+60) notes.push(`🔄 המחירים עודכנו ${ago(meta.updated)}`);
+  LS.set('seenUpdate',String(meta.updated)); LS.set('seenCities',JSON.stringify(meta.cities.map(c=>c.name)));
+}
+function storeNotes(list){ // סניפים חדשים בעיר מאז הביקור הקודם
+  for(const {c,d} of list){
+    const names=d.stores.map(s=>s[0]+' – '+s[1]), key='seenStores:'+c.slug, seen=JSON.parse(LS.get(key,'null')||'null');
+    const HOME=['ויקטורי','יינות ביתן / קרפור','סופר-פארם','חצי חינם','מחסני השוק','נתיב החסד','ח. כהן'];
+    const base=seen||names.filter(n=>!HOME.includes(n.split(' – ')[0]));   // פעם ראשונה: הסניפים מהמחשב בבית נחשבים חדשים
+    { const nw=names.filter(n=>!base.includes(n));
+      if(nw.length){ const chains=[...new Set(nw.map(n=>n.split(' – ')[0]))];
+        notes.unshift(`🎉 ${nw.length===1?'נוסף סניף חדש':`נוספו ${nw.length} סניפים חדשים`} ב${esc(c.name)}: <b>${chains.map(esc).join(', ')}</b>`);} }
+    LS.set(key,JSON.stringify(names));
+  }
+  if(notes.length){ notify(notes.join('<br>')); notes.length=0; }
+}
+setInterval(async()=>{   // בזמן שהאפליקציה פתוחה: בדיקה אם הסתיים עדכון (כל דקה כשעיר בהכנה, אחרת כל 5 דקות)
+  if(!meta)return;
+  const now=Date.now(); if(!Object.keys(pending).length&&now-(window._lastPoll||0)<300000)return; window._lastPoll=now;
+  try{const m=await (await fetch('data/cities.json?'+now)).json();
     if(m.updated>meta.updated){meta=m;for(const k in cache)delete cache[k];drawCities();
-      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');await loadCity();}}catch(e){}
+      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
+      updateNotes(); await loadCity();}}catch(e){}
 },60000);
 // כמה ערים יחד: מאחדים סניפים, מוצרים (לפי ברקוד) ומבצעים
 function mergeCities(list){
@@ -222,7 +256,7 @@ async function loadCity(){
   }
   const errHtml=bad.map(c=>`<div class="err" style="margin-bottom:8px">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף דרך "➕ עיר אחרת".</span>`:''}</div>`).join('');
   if(!ok.length){data=null;$('#list').innerHTML=errHtml;$('#meta').textContent='';return;}
-  data=mergeCities(ok);
+  data=mergeCities(ok); storeNotes(ok);
   $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${ok.length>1?` ב-${ok.length} ערים`:''} · עודכן ${ago(meta.updated)}`;
   shown=60;draw(); if(errHtml) $('#list').insertAdjacentHTML('afterbegin',errHtml);
   lastRes=null;selStore=null;renderItems();if(tab==='basket'&&$('#blist').value.trim())runBasket();
