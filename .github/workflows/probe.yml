@@ -1,0 +1,17 @@
+name: בדיקת מקורות מיקום
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "== data.gov.il package search"
+          curl -s -m 30 -G "https://data.gov.il/api/3/action/package_search" --data-urlencode "q=יישובים" --data-urlencode "rows=8" -A "supr-prices/1.0" | python3 -c "
+          import sys,json
+          d=json.load(sys.stdin)
+          for p in d['result']['results']:
+              print('PKG',p['name'],'|',p['title'])
+              for r in p['resources'][:4]: print('   RES',r['id'],'|',r.get('name'),'|',r.get('format'))
+          " || echo fail
+          echo "== nominatim"
+          curl -s -m 30 -G "https://nominatim.openstreetmap.org/search" --data-urlencode "q=נס ציונה, ישראל" --data-urlencode "format=json" --data-urlencode "limit=1" -A "supr-prices/1.0 (github.com/omrimalbin/supr-prices)" | head -c 400; echo
