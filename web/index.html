@@ -82,6 +82,13 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .chip.pendc{border-style:dashed;color:#b25e00}
 #addCity{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 10px;margin-top:8px}
 .pend{font-size:13px;color:#b25e00;margin-top:6px}
+.clear{font:inherit;font-size:14px;border:0;background:none;color:var(--err);padding:4px 2px;margin-top:2px}
+.store{padding:10px 14px}
+.store .tot{font-size:19px}
+.store .info{font-size:13px;color:var(--muted);margin-top:2px}
+.store .info .miss{color:var(--err)}
+.store .save{font-size:13px;color:var(--accent);font-weight:600;margin-top:2px}
+.morebtn{display:block;width:100%;font:inherit;font-size:14px;border:1px dashed var(--line);background:none;color:var(--accent);border-radius:12px;padding:9px;margin-bottom:8px}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
@@ -109,6 +116,7 @@ h3{font-size:16px;margin:14px 0 8px}
 <main id="list"><div class="muted">טוען…</div></main>
 <main id="basket" hidden>
   <div id="bitems"></div>
+  <button class="clear" id="bclear" hidden>🗑️ ניקוי כל הרשימה</button>
   <div class="row" style="margin-top:8px"><input id="badd" placeholder="הוספת פריט… (למשל: חלב, אורז פרסי, ביצים)" autocomplete="off" enterkeyhint="done"><button class="addbtn" id="baddBtn">הוספה</button></div>
   <details class="txt"><summary>עריכה כטקסט / הדבקת רשימה שלמה</summary>
   <textarea id="blist" placeholder="מוצר בכל שורה, למשל:
@@ -117,7 +125,7 @@ h3{font-size:16px;margin:14px 0 8px}
 עגבניות 2 (= 2 ק&quot;ג)
 שמן 1 ליטר"></textarea></details>
   <button class="btn" id="bgo">השוואת מחירים</button>
-  <div class="muted" style="margin-top:6px">לכל שורה נבחר בכל סניף המוצר המתאים הזול ביותר (לפי מחיר לליטר/ק"ג). אפשר להוסיף כמות (x2) או גודל (1 ליטר). לחיצה על "החלפה" נועלת מוצר מסוים.</div>
+  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. "החלפה" בוחרת מוצר אחר.</div>
   <div id="bres"></div>
 </main>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
@@ -279,6 +287,7 @@ function setLines(arr,recompute=true){
 function effQty(l){const ov=qtyOv[keyOf(l)];return Math.max(splitLine(l).qty,ov?ov.qty:0);}
 function renderItems(){
   const ls=lines();
+  $('#bclear').hidden=!ls.length;
   $('#bitems').innerHTML=ls.length?ls.map((l,i)=>{const {name}=splitLine(l),ov=qtyOv[keyOf(l)],q=effQty(l);
     return `<div class="bitem"><div class="nm">${esc(name)}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}</div>
       <div class="step"><button data-dec="${i}" aria-label="פחות">−</button><span>${q}</span><button data-inc="${i}" aria-label="עוד">+</button></div>
@@ -290,6 +299,12 @@ function renderItems(){
     ls[i]=joinLine(name,q-1);setLines(ls);});
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const ls=lines();ls.splice(+b.dataset.rm,1);setLines(ls);});
 }
+$('#bclear').onclick=()=>{
+  if(!confirm('למחוק את כל רשימת הקניות?'))return;
+  for(const k in qtyOv) delete qtyOv[k]; saveDeals();
+  lastRes=null; selStore=null; $('#bres').innerHTML=''; setLines([],false);
+};
+let showAllStores=false;
 function addItem(){
   const v=$('#badd').value.trim(); if(!v)return;
   const ls=lines(), {name,qty}=splitLine(v), k=keyOf(v);
@@ -317,14 +332,20 @@ function runBasket(){
   if(selStore==null) selStore=res.stores[0].si;
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
   let h='<h3>השוואה בין הסניפים</h3>';
-  h+=res.stores.map((s,i)=>`<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}">
-     <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
-     <div class="sub ${s.found<n?'miss':''}">${s.found===n?'כל הפריטים קיימים':`חסרים ${n-s.found} מתוך ${n} פריטים`}</div>
-     ${s.rows.some(r=>r&&r.promo)?`<div class="promo">🏷️ כולל ${s.rows.filter(r=>r&&r.promo).length} מבצעים</div>`:''}
-     ${staleTxt(s.si)?`<div class="sub">${staleTxt(s.si)}</div>`:''}
-     ${s.offers?`<div class="promo">❓ ${s.offers} מבצעי כמות מחכים לאישור</div>`:''}</div>
-     <div class="tot">${nis(s.total)}</div></div></div>`).join('');
-  h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="sub">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · חסרים ${n-mixedFound}`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
+  const full=res.stores.filter(s=>s.found===n), dearest=full.length?Math.max(...full.map(s=>s.total)):0;
+  let shownStores=showAllStores?res.stores:res.stores.slice(0,6);
+  if(!showAllStores&&typeof selStore==='number'&&!shownStores.some(s=>s.si===selStore)) shownStores=[...shownStores,res.stores.find(s=>s.si===selStore)];
+  h+=shownStores.map((s,i)=>{
+    const promos=s.rows.filter(r=>r&&r.promo).length;
+    const info=[s.found===n?'כל הפריטים':`<span class="miss">חסרים ${n-s.found}</span>`,
+      promos?`🏷️ ${promos} מבצעים`:'', s.offers?`❓ ${s.offers} לאישור`:'', staleTxt(s.si)].filter(Boolean).join(' · ');
+    const save=i===0&&s.found===n&&dearest-s.total>0.5?`<div class="save">חוסך ${nis(dearest-s.total)} לעומת היקר</div>`:'';
+    return `<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}"><div class="top"><div>
+      <b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
+      <div class="info">${info}</div>${save}</div><div class="tot">${nis(s.total)}</div></div></div>`;}).join('');
+  if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
+  if(mixedTot<res.stores[0].total-0.5||selStore==='mix')
+    h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="info">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · <span class="miss">חסרים ${n-mixedFound}</span>`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
   const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
   const title=selStore==='mix'?'סל משולב':res.stores.find(s=>s.si===selStore).name;
   // ---- לוח מבצעים ----
@@ -361,7 +382,9 @@ function runBasket(){
       <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
       ${offer}<button class="swap" data-i="${i}">החלפה</button></div>`;}).join('');
   $('#bres').innerHTML=h;
-  document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();});
+  document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();
+    setTimeout(()=>{const d=[...document.querySelectorAll('#bres h3')].pop();if(d)d.scrollIntoView({behavior:'smooth',block:'start'});},30);});
+  const mb=$('#moreStores'); if(mb) mb.onclick=()=>{showAllStores=!showAllStores;runBasket();};
   document.querySelectorAll('.swap').forEach(b=>b.onclick=()=>openPicker(+b.dataset.i));
   document.querySelectorAll('[data-deal]').forEach(b=>b.onclick=()=>{deals[b.dataset.deal]=false;saveDeals();runBasket();});
   document.querySelectorAll('[data-yes]').forEach(b=>b.onclick=()=>{const i=+b.dataset.yes,p=res.parsed[i],r=rows[i],si=selStore==='mix'?r.si:selStore;
