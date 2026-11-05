@@ -1,6 +1,6 @@
 // שומר עותק של האפליקציה והנתונים האחרונים, כדי שתיפתח גם בלי אינטרנט.
 // תמיד מנסה קודם את הרשת (נתונים טריים), ונופל לעותק השמור רק כשאין חיבור.
-const CACHE = "prices-v16";
+const CACHE = "prices-v17";
 const SHELL = ["./", "index.html", "match.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

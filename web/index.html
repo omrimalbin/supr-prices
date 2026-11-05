@@ -487,7 +487,7 @@ function runBasket(){
       <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line"><div class="top"><div><div class="q">${esc(p.line)}</div>
       <div>${esc(it[1])}${r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div><div class="sub">${esc([sizeTxt(it),upTxt(it,r.cost/r.used)].filter(Boolean).join(' · '))}</div>${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
-      ${promoLine}${pinned?'<div class="lock">📌 מוצר קבוע – ייבחר תמיד, בלי קשר למחיר</div>':temp?'<div class="lock">↔️ הוחלף ידנית (רק עכשיו)</div>':''}</div>
+      ${promoLine}${r.fallback?`<div class="lock">ℹ️ "${esc(itemName(pickOf(k))||'המוצר שבחרת')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:pinned?'<div class="lock">📌 מוצר קבוע – ייבחר תמיד, בלי קשר למחיר</div>':temp?'<div class="lock">↔️ הוחלף ידנית (רק עכשיו)</div>':''}</div>
       <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
       ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
         ?`<button class="swap pinon" data-unpin="${esc(k)}">📌 קבוע · ביטול</button>`

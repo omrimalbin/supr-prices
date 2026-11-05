@@ -173,12 +173,21 @@
       const q = parseLine(l.line);
       if (l.qty) q.qty = Math.max(q.qty, l.qty);   // כמות שהוגדלה בעקבות מבצע
       const locked = l.pick && byCode.get(l.pick);
-      return { ...l, q, cands: locked ? [locked] : candidates(data.items, q) };
+      const auto = candidates(data.items, q);
+      // מוצר שנבחר/קובע: בסניף שמוכר אותו – הוא; בסניף שלא – הזול ביותר שמתאים לשורה
+      return { ...l, q, cands: locked ? [locked] : auto, alt: locked ? auto : null };
     });
+    const pick = (p, si) => {
+      const b = bestIn(p.cands, si, p.q.qty, deals);
+      if (b || !p.alt) return b;
+      const f = bestIn(p.alt, si, p.q.qty, deals);
+      if (f) f.fallback = true;
+      return f;
+    };
     const stores = data.stores.map((st, si) => {
       let total = 0, found = 0, offers = 0;
       const rows = parsed.map(p => {
-        const b = bestIn(p.cands, si, p.q.qty, deals);
+        const b = pick(p, si);
         if (!b) return null;
         found++;
         total += b.cost;
@@ -191,13 +200,16 @@
     const mixed = parsed.map(p => {
       let best = null;
       data.stores.forEach((_, si) => {
-        const b = bestIn(p.cands, si, p.q.qty, deals);
-        if (b && (!best || b.key < best.key)) best = { ...b, si };
+        const b = pick(p, si);
+        if (!b) return;
+        // סל משולב: המוצר שבחרת (איפה שנמכר) קודם לתחליף
+        if (!best || (best.fallback && !b.fallback) || (best.fallback === !!b.fallback && b.key < best.key)) best = { ...b, si };
       });
       return best;
     });
     return { parsed, stores, mixed };
   }
+
 
   // כל מבצעי הכמות על מוצרים שמתאימים לשורה, בסניף מסוים (מהמשתלם ביותר)
   function dealsFor(cands, store) {
