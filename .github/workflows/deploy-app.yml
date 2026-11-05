@@ -1,0 +1,44 @@
+name: פרסום מהיר של האפליקציה
+
+# שינוי במסך בלבד (תיקייה web/) – מפרסם תוך דקה, בלי לשאוב מחדש את המחירים.
+# לוקח את הנתונים האחרונים מענף data ומחליף רק את קובצי האפליקציה.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-fast
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: נתונים אחרונים + קובצי האפליקציה החדשים
+        run: |
+          git fetch --depth 1 origin data
+          mkdir site
+          git --work-tree=site checkout origin/data -- .
+          git reset -q
+          cp web/* site/
+          ls site site/data | head -30
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

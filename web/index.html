@@ -68,6 +68,15 @@ textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12
 .prow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
 .prow button{font:inherit;font-size:13px;border-radius:8px;padding:5px 10px;border:1px solid #d08b1f;background:var(--card);color:#b25e00;white-space:nowrap}
 .prow button.add{background:#d08b1f;color:#fff}
+.bitem{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:6px}
+.bitem .nm{flex:1;font-size:16px}
+.bitem .ovq{font-size:12px;color:#b25e00}
+.step{direction:ltr;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.step button{font:inherit;font-size:18px;width:34px;height:32px;border:0;background:var(--bg);color:var(--ink)}
+.step span{min-width:30px;text-align:center;font-weight:600}
+.rm{font:inherit;border:0;background:none;color:var(--muted);font-size:18px;padding:4px 6px}
+.addbtn{font:inherit;font-weight:600;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:10px 16px;white-space:nowrap}
+details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 0}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
 #picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
 #picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
@@ -88,14 +97,14 @@ h3{font-size:16px;margin:14px 0 8px}
 </header>
 <main id="list"><div class="muted">טוען…</div></main>
 <main id="basket" hidden>
-  <textarea id="blist" placeholder="כתבו מוצר בכל שורה, למשל:
+  <div id="bitems"></div>
+  <div class="row" style="margin-top:8px"><input id="badd" placeholder="הוספת פריט… (למשל: חלב, אורז פרסי, ביצים)" autocomplete="off" enterkeyhint="done"><button class="addbtn" id="baddBtn">הוספה</button></div>
+  <details class="txt"><summary>עריכה כטקסט / הדבקת רשימה שלמה</summary>
+  <textarea id="blist" placeholder="מוצר בכל שורה, למשל:
 חלב
-אורז פרסי
-ביצים
 לחם x2
 עגבניות 2 (= 2 ק&quot;ג)
-קוטג
-שמן 1 ליטר"></textarea>
+שמן 1 ליטר"></textarea></details>
   <button class="btn" id="bgo">השוואת מחירים</button>
   <div class="muted" style="margin-top:6px">לכל שורה נבחר בכל סניף המוצר המתאים הזול ביותר (לפי מחיר לליטר/ק"ג). אפשר להוסיף כמות (x2) או גודל (1 ליטר). לחיצה על "החלפה" נועלת מוצר מסוים.</div>
   <div id="bres"></div>
@@ -183,7 +192,42 @@ function setTab(t){tab=t;LS.set('tab',t);
   if(t==='basket'&&data&&$('#blist').value.trim()&&!lastRes) runBasket();}
 document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>setTab(x.dataset.t));
 $('#blist').value=LS.get('blist','');
-$('#blist').oninput=()=>LS.set('blist',$('#blist').value);
+$('#blist').oninput=()=>{LS.set('blist',$('#blist').value);renderItems();};
+// ---- עריכת הרשימה: הוספה, הסרה, כמות ----
+function splitLine(l){                      // "לחם x2" -> {name:"לחם", qty:2}
+  let m=l.match(/^(.*?)\s*[x×*]\s*(\d+)\s*$/i)||l.match(/^(.*?\D)\s+(\d{1,2})\s*$/);
+  if(m) return {name:m[1].trim(),qty:+m[2]||1};
+  m=l.match(/^\s*(\d{1,2})\s+(\D.*)$/); if(m) return {name:m[2].trim(),qty:+m[1]||1};
+  return {name:l.trim(),qty:1};
+}
+const joinLine=(name,q)=>q>1?`${name} x${q}`:name;
+function setLines(arr,recompute=true){
+  $('#blist').value=arr.join('\n'); LS.set('blist',$('#blist').value); renderItems();
+  if(recompute&&$('#bres').innerHTML.trim()) runBasket();
+}
+function effQty(l){const ov=qtyOv[keyOf(l)];return Math.max(splitLine(l).qty,ov?ov.qty:0);}
+function renderItems(){
+  const ls=lines();
+  $('#bitems').innerHTML=ls.length?ls.map((l,i)=>{const {name}=splitLine(l),ov=qtyOv[keyOf(l)],q=effQty(l);
+    return `<div class="bitem"><div class="nm">${esc(name)}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}</div>
+      <div class="step"><button data-dec="${i}" aria-label="פחות">−</button><span>${q}</span><button data-inc="${i}" aria-label="עוד">+</button></div>
+      <button class="rm" data-rm="${i}" aria-label="הסרה">✕</button></div>`;}).join('')
+    :'<div class="muted">הרשימה ריקה – הוסיפו פריטים למטה.</div>';
+  document.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{const ls=lines(),i=+b.dataset.inc,{name}=splitLine(ls[i]);ls[i]=joinLine(name,effQty(ls[i])+1);setLines(ls);});
+  document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{const ls=lines(),i=+b.dataset.dec,{name}=splitLine(ls[i]),q=effQty(ls[i]);
+    if(q<=1)return; const k=keyOf(ls[i]); if(qtyOv[k]){delete qtyOv[k];saveDeals();}   // הורדת כמות מתחת למבצע – המבצע מתבטל
+    ls[i]=joinLine(name,q-1);setLines(ls);});
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const ls=lines();ls.splice(+b.dataset.rm,1);setLines(ls);});
+}
+function addItem(){
+  const v=$('#badd').value.trim(); if(!v)return;
+  const ls=lines(), {name,qty}=splitLine(v), k=keyOf(v);
+  const j=ls.findIndex(l=>keyOf(l)===k);
+  if(j>=0){ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty);} else ls.push(joinLine(name,qty));
+  $('#badd').value=''; setLines(ls); $('#badd').focus();
+}
+$('#baddBtn').onclick=addItem;
+$('#badd').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addItem();}};
 $('#bgo').onclick=()=>{selStore=null;runBasket();setTimeout(()=>$('#bres').scrollIntoView({behavior:'smooth'}),50);};
 const lines=()=>$('#blist').value.split('\n').map(l=>l.trim()).filter(Boolean);
 const keyOf=l=>Match.parseLine(l).text;
@@ -196,6 +240,7 @@ function runBasket(){
   for(const k in qtyOv) if(!live.has(k)){delete qtyOv[k];dirty=true;}   // שורה שנמחקה – המבצע שלה מתבטל
   for(const l of ls){const k=keyOf(l); if(qtyOv[k]&&Match.parseLine(l).qty>=qtyOv[k].qty){delete qtyOv[k];dirty=true;}}  // הכמות שהוקלדה כבר מספיקה
   if(dirty) saveDeals();
+  renderItems();
   const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)],qty:qtyOv[keyOf(l)]&&qtyOv[keyOf(l)].qty})),deals);lastRes=res;
   const n=ls.length;
   if(selStore==null) selStore=res.stores[0].si;
@@ -286,5 +331,6 @@ $('#installX').onclick=()=>{ LS.set('noInstall','1'); $('#install').style.displa
 addEventListener('appinstalled',()=>{$('#install').style.display='none';});
 
 setTab(tab);
+renderItems();
 init().catch(e=>$('#list').innerHTML=`<div class="err">הנתונים עוד לא מוכנים – ההרצה הראשונה לוקחת כחצי שעה. (${esc(e.message)})</div>`);
 </script></body></html>
