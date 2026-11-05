@@ -271,6 +271,7 @@ function setTab(t){tab=t;LS.set('tab',t);
   if(t==='basket'&&data&&$('#blist').value.trim()&&!lastRes) runBasket();}
 document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>setTab(x.dataset.t));
 $('#blist').value=LS.get('blist','');
+setTimeout(()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}},0);
 $('#blist').oninput=()=>{LS.set('blist',$('#blist').value);renderItems();};
 $('#blist').addEventListener('paste',()=>setTimeout(()=>{$('#blist').value=cleanText($('#blist').value);LS.set('blist',$('#blist').value);renderItems();},0));
 $('#blist').addEventListener('blur',()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}});
@@ -326,10 +327,18 @@ $('#badd').addEventListener('paste',e=>{     // הדבקת רשימה שלמה �
 });
 $('#bgo').onclick=()=>{selStore=null;runBasket();setTimeout(()=>$('#bres').scrollIntoView({behavior:'smooth'}),50);};
 // ניקוי שורה מרשימה מודבקת: תבליטים, מספור, אמוג'י, "× 1"; כותרות קטגוריה ("ירקות:") נמחקות
+// שמות קטגוריה נפוצים ברשימות קניות – לא מוצרים
+const CATS=new Set(("ירקות|פירות|ירקות ופירות|פירות וירקות|פירות ירקות|ירק|חלבי|חלביים|מוצרי חלב|חלב ומוצריו|חלב וביצים|מקרר|יבשים|מוצרים יבשים|מזווה|"+
+  "בשרי|בשר ועוף|בשר ודגים|עוף ובשר|דגים ובשר|קצביה|אטליז|קפואים|מוקפאים|קפוא|מקפיא|ניקיון|ניקוי|חומרי ניקוי|כלי ניקוי|טואלטיקה|"+
+  "היגיינה|פארם|טיפוח|משקאות|שתייה|שתיה|מאפים|לחמים|מאפייה|מאפיה|לחם ומאפים|חטיפים|ממתקים|ממתקים וחטיפים|חטיפים וממתקים|תבלינים|"+
+  "רטבים|רטבים ותבלינים|שימורים|קטניות|דגנים|ארוחת בוקר|תינוקות|לתינוק|חד פעמי|חד-פעמי|כלים חד פעמיים|לבית|כללי|שונות|"+
+  "אחר|נוספים|קניות|רשימת קניות|מעדניה|מעדנייה|דליקטסן|משק בית|מוצרי נייר").split("|"));
 function cleanLine(l){
   l=String(l||'').replace(/[‎‏‪-‮]/g,'').trim();
   if(!l) return '';
-  if(/[:：]\s*$/.test(l)) return '';                                   // כותרת קטגוריה
+  if(/[:：]\s*$/.test(l)) return '';                                   // כותרת קטגוריה ("ירקות:")
+  const bare=l.replace(/[\p{Extended_Pictographic}️*#_•\-–—=]/gu,'').replace(/\(\d+\)/g,'').replace(/\s+/g,' ').trim();
+  if(CATS.has(bare)) return '';                                       // כותרת בלי נקודתיים ("חלבי", "🥦 ירקות")
   l=l.replace(/^[\s•●○◦▪▫■□►▸‣⁃∙·*\-–—✓✔☐☑✅🔲⬜️]+/u,'')               // תבליטים
      .replace(/^\(?\d{1,2}[.)]\s+/,'')                                  // מספור "1." / "1)"
      .replace(/^\[[ xX]?\]\s*/,'')                                      // תיבות סימון
