@@ -169,20 +169,23 @@
   function compareBasket(data, lines, deals = {}) {
     prep(data.items);
     const byCode = new Map(data.items.map(it => [it[0], it]));
+    // l.pick = מוצר קבוע (📌, בכל הסניפים); l.tmp = {סניף: ברקוד} – החלפה ידנית בסניף מסוים בלבד
     const parsed = lines.map(l => {
       const q = parseLine(l.line);
       if (l.qty) q.qty = Math.max(q.qty, l.qty);   // כמות שהוגדלה בעקבות מבצע
-      const locked = l.pick && byCode.get(l.pick);
-      const auto = candidates(data.items, q);
-      // מוצר שנבחר/קובע: בסניף שמוכר אותו – הוא; בסניף שלא – הזול ביותר שמתאים לשורה
-      return { ...l, q, cands: locked ? [locked] : auto, alt: locked ? auto : null };
+      return { ...l, q, cands: candidates(data.items, q), pinned: l.pick && byCode.get(l.pick), tmp: l.tmp || {} };
     });
     const pick = (p, si) => {
-      const b = bestIn(p.cands, si, p.q.qty, deals);
-      if (b || !p.alt) return b;
-      const f = bestIn(p.alt, si, p.q.qty, deals);
-      if (f) f.fallback = true;
-      return f;
+      const t = p.tmp[si] && byCode.get(p.tmp[si]);
+      if (t) { const b = bestIn([t], si, p.q.qty, deals); if (b) { b.manual = true; return b; } }
+      if (p.pinned) {
+        const b = bestIn([p.pinned], si, p.q.qty, deals);
+        if (b) { b.pinned = true; return b; }
+        const f = bestIn(p.cands, si, p.q.qty, deals);   // הקבוע לא נמכר כאן – הזול ביותר בסניף
+        if (f) f.fallback = true;
+        return f;
+      }
+      return bestIn(p.cands, si, p.q.qty, deals);         // ברירת מחדל: הזול ביותר בסניף
     };
     const stores = data.stores.map((st, si) => {
       let total = 0, found = 0, offers = 0;
