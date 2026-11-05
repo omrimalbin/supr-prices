@@ -78,6 +78,8 @@ textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12
 .addbtn{font:inherit;font-weight:600;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:10px 16px;white-space:nowrap}
 details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 0}
 .chip.more{border-style:dashed;color:var(--muted)}
+.cities{flex-wrap:wrap;padding-top:0}.cities .chip{font-size:15px;padding:7px 14px}
+.chip.pendc{border-style:dashed;color:#b25e00}
 #addCity{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 10px;margin-top:8px}
 .pend{font-size:13px;color:#b25e00;margin-top:6px}
 .old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
@@ -89,16 +91,12 @@ h3{font-size:16px;margin:14px 0 8px}
 <header>
   <h1>מחירי סופר</h1>
   <div class="tabs"><span class="tab on" data-t="prod">חיפוש מוצרים</span><span class="tab" data-t="basket">רשימת קניות</span></div>
-  <div class="row"><select id="city"></select></div>
-  <div class="chips" id="area"></div>
+  <div class="chips cities" id="cities"></div>
   <div id="addCity" hidden>
-    <div class="row" style="margin-top:8px"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off"></div>
-    <datalist id="allCities"></datalist>
-    <div class="row" style="margin-top:6px"><select id="newRadius">
-      <option value="0">רק סניפים בעיר</option><option value="3">כולל סניפים עד 3 ק"מ</option><option value="5">כולל סניפים עד 5 ק"מ</option>
-      <option value="10">כולל סניפים עד 10 ק"מ</option><option value="15">כולל סניפים עד 15 ק"מ</option></select>
+    <div class="row" style="margin-top:8px"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off">
       <button class="addbtn" id="newCityBtn">שאיבה</button></div>
-    <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע ברשימה כשתהיה מוכנה.</div>
+    <datalist id="allCities"></datalist>
+    <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע כאן כשתהיה מוכנה.</div>
   </div>
   <div class="prodOnly" style="margin-top:8px"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"></div>
   <div class="chips prodOnly" id="sorts">
@@ -134,81 +132,87 @@ let meta=null,data=null,sort=LS.get('sort','name'),shown=60;
 
 function ago(t){const m=Math.round((Date.now()/1000-t)/60);return m<1?"עכשיו":m<60?`לפני ${m} דקות`:m<1440?`לפני ${Math.round(m/60)} שעות`:`לפני ${Math.round(m/1440)} ימים`;}
 
-const pending=JSON.parse(LS.get('pending','{}'));      // עיר -> {radius, at}
-const AREAS=[0,3,5,10,15];
-const issueUrl=(name,r)=>`https://github.com/${meta.repo}/issues/new?title=${encodeURIComponent('עיר: '+name+(r?' | '+r:''))}&body=${encodeURIComponent('בקשה מהאפליקציה. לחצו "Submit new issue" – השאיבה תתחיל לבד ברקע, וה-issue ייסגר כשהעיר מוכנה.')}`;
-function cityOptions(){
+const pending=JSON.parse(LS.get('pending','{}'));      // עיר חדשה שבהכנה -> {at}
+const issueUrl=name=>`https://github.com/${meta.repo}/issues/new?title=${encodeURIComponent('עיר: '+name)}&body=${encodeURIComponent('בקשה מהאפליקציה. לחצו "Submit new issue" – השאיבה תתחיל לבד ברקע, וה-issue ייסגר כשהעיר מוכנה.')}`;
+let selCities=JSON.parse(LS.get('cities','null')||'null')||(LS.get('city','')?[LS.get('city','')]:[]);
+const cache={};   // slug -> נתוני העיר
+function drawCities(){
   const have=new Set(meta.cities.map(c=>c.name));
-  for(const n in pending) if(have.has(n)&&(meta.cities.find(c=>c.name===n).updated||0)>pending[n].at/1000) delete pending[n];
+  for(const n in pending) if(have.has(n)) delete pending[n];
   LS.set('pending',JSON.stringify(pending));
-  const pend=Object.keys(pending).filter(n=>!have.has(n)||pending[n].radius!=null);
-  return meta.cities.map(c=>`<option value="${c.slug}">${esc(c.name)}${c.items?` (${c.with_prices} סניפים)`:''}${pending[c.name]?' ⏳':''}</option>`).join('')
-    +pend.filter(n=>!have.has(n)).map(n=>`<option value="" disabled>⏳ ${esc(n)} – בהכנה…</option>`).join('')
-    +(meta.repo?'<option value="__add">➕ עיר אחרת…</option>':'');
+  $('#cities').innerHTML=meta.cities.map(c=>`<span class="chip ${selCities.includes(c.slug)?'on':''}" data-slug="${c.slug}">${selCities.includes(c.slug)&&meta.cities.length>1?'✓ ':''}${esc(c.name)}</span>`).join('')
+    +Object.keys(pending).map(n=>`<span class="chip pendc">⏳ ${esc(n)} – בהכנה</span>`).join('')
+    +(meta.repo?'<span class="chip more" id="addChip">➕ עיר אחרת</span>':'');
+  document.querySelectorAll('#cities [data-slug]').forEach(x=>x.onclick=()=>{
+    const sl=x.dataset.slug;
+    if(selCities.includes(sl)){ if(selCities.length===1) return; selCities=selCities.filter(v=>v!==sl); }   // לפחות עיר אחת
+    else selCities.push(sl);
+    LS.set('cities',JSON.stringify(selCities)); drawCities(); loadCity();});
+  const ac=$('#addChip'); if(ac) ac.onclick=()=>{$('#addCity').hidden=!$('#addCity').hidden; if(!$('#addCity').hidden)$('#newCity').focus();};
 }
 async function init(){
   meta=await (await fetch('data/cities.json?'+Date.now())).json();
   if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
   else $('#refresh').hidden=true;
   setTab(tab);
-  $('#city').innerHTML=cityOptions();
+  selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
+  if(!selCities.length&&meta.cities.length) selCities=[meta.cities[0].slug];
+  drawCities();
   $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
-  const saved=LS.get('city','');if(meta.cities.some(c=>c.slug===saved))$('#city').value=saved;
   document.querySelectorAll('#sorts .chip').forEach(ch=>{ch.classList.toggle('on',ch.dataset.s===sort);ch.onclick=()=>{sort=ch.dataset.s;LS.set('sort',sort);document.querySelectorAll('#sorts .chip').forEach(x=>x.classList.toggle('on',x===ch));shown=60;draw();};});
   await loadCity();
 }
-// ---- עיר חדשה / אזור: נשאבים ברקע ב-GitHub ----
-function requestCity(name,r){
+// ---- עיר חדשה: נשאבת ברקע ב-GitHub ----
+function requestCity(name){
   name=name.trim(); if(!name)return;
-  pending[name]={radius:r,at:Date.now()}; LS.set('pending',JSON.stringify(pending));
-  window.open(issueUrl(name,r),'_blank');
-  $('#addMsg').innerHTML=`נפתח GitHub – לחצו שם <b>Submit new issue</b>. אחרי זה "${esc(name)}" תישאב ברקע (כ-10–20 דקות), ואפשר להמשיך להשתמש באפליקציה. העיר תתעדכן כאן לבד.`;
-  $('#city').innerHTML=cityOptions(); const c=meta.cities.find(x=>x.name===curCityName); if(c)$('#city').value=c.slug;
+  if(meta.cities.some(c=>c.name===name)){$('#addMsg').textContent=`"${name}" כבר קיימת ברשימה.`;return;}
+  pending[name]={at:Date.now()}; LS.set('pending',JSON.stringify(pending));
+  window.open(issueUrl(name),'_blank');
+  $('#addMsg').innerHTML=`נפתח GitHub – לחצו שם <b>Submit new issue</b>. אחרי זה "${esc(name)}" תישאב ברקע (כ-10–20 דקות), ואפשר להמשיך להשתמש באפליקציה. העיר תופיע כאן לבד.`;
+  $('#newCity').value=''; drawCities();
 }
-$('#newCityBtn').onclick=()=>requestCity($('#newCity').value,+$('#newRadius').value);
-setInterval(async()=>{   // בודק אם עיר שבהכנה כבר מוכנה
+$('#newCityBtn').onclick=()=>requestCity($('#newCity').value);
+$('#newCity').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();requestCity($('#newCity').value);}};
+setInterval(async()=>{   // עיר שבהכנה מוכנה? מוסיפים אותה לרשימה
   if(!Object.keys(pending).length||!meta)return;
   try{const m=await (await fetch('data/cities.json?'+Date.now())).json();
-    if(m.updated>meta.updated){meta=m;const cur=$('#city').value;$('#city').innerHTML=cityOptions();
-      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
-      if(meta.cities.some(c=>c.slug===cur)){$('#city').value=cur;await loadCity();}}}catch(e){}
+    if(m.updated>meta.updated){meta=m;for(const k in cache)delete cache[k];drawCities();
+      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');await loadCity();}}catch(e){}
 },60000);
-let rawData=null,curCityName='';
-function areaOf(c){const v=LS.get('area:'+c.name,null);return v==null?(c.radius||0):Math.min(+v,c.radius||0);}
-function drawArea(c){
-  const r=c.radius||0, cur=areaOf(c);
-  $('#area').innerHTML=[...new Set([...AREAS,r])].sort((x,y)=>x-y).map(a=>a<=r?`<span class="chip ${a===cur?'on':''}" data-a="${a}">${a?'עד '+a+' ק"מ':'בעיר בלבד'}</span>`
-    :(meta.repo?`<span class="chip more" data-req="${a}">+ ${a} ק"מ</span>`:'')).join('')
-    +(pending[c.name]&&pending[c.name].radius>r?`<span class="pend">⏳ אזור ${pending[c.name].radius} ק"מ בהכנה…</span>`:'');
-  document.querySelectorAll('#area [data-a]').forEach(x=>x.onclick=()=>{LS.set('area:'+c.name,x.dataset.a);applyArea(c);});
-  document.querySelectorAll('#area [data-req]').forEach(x=>x.onclick=()=>{
-    const a=+x.dataset.req; if(confirm(`לשאוב גם סניפים עד ${a} ק"מ מ${c.name}? זה רץ ברקע ב-GitHub (כ-10–20 דקות).`)){LS.set('area:'+c.name,a);requestCity(c.name,a);drawArea(c);}});
+// כמה ערים יחד: מאחדים סניפים, מוצרים (לפי ברקוד) ומבצעים
+function mergeCities(list){
+  const multi=list.length>1, stores=[], promos=[], byCode=new Map();
+  for(const {c,d} of list){
+    const so=stores.length, po=promos.length;
+    d.stores.forEach(st=>{const nm=multi&&!st[1].includes(c.name)?`${st[1]} (${c.name})`:st[1];stores.push([st[0],nm,...st.slice(2)]);});
+    promos.push(...(d.promos||[]));
+    for(const it of d.items){
+      let x=byCode.get(it[0]); if(!x){x=[it[0],it[1],it[2],[],it[4],it[5]];byCode.set(it[0],x);}
+      for(const e of it[3]) x[3].push([e[0]+so,e[1],...(e[2]?[e[2].map(o=>[o[0],o[1],o[2]+po])]:[])]);
+    }
+  }
+  const items=[...byCode.values()];
+  for(const it of items){it[3].sort((a,b)=>a[1]-b[1]);const p=it[3];it.min=p[0][1];it.max=p[p.length-1][1];it.n=p.length;}
+  return {stores,items,promos};
 }
-function viewData(raw,r){   // רק סניפים בטווח שנבחר
-  const keep=[],map={};
-  raw.stores.forEach((st,i)=>{if((st[3]||0)<=r+1e-9){map[i]=keep.length;keep.push(st);}});
-  const items=[];
-  for(const it of raw.items){const p=it[3].filter(e=>e[0] in map).map(e=>[map[e[0]],...e.slice(1)]);
-    if(p.length){const x=[it[0],it[1],it[2],p,it[4],it[5]];x.min=p[0][1];x.max=p[p.length-1][1];x.n=p.length;items.push(x);}}
-  return {stores:keep,items,promos:raw.promos};
-}
-function applyArea(c){
-  const r=areaOf(c); data=viewData(rawData,r); drawArea(c);
-  const near=data.stores.filter(s=>(s[3]||0)>0).length;
-  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${near?` (${near} באזור)`:''} · עודכן ${ago(c.updated||meta.updated)}`;
-  shown=60;draw();
-  lastRes=null;selStore=null;if(tab==='basket'&&$('#blist').value.trim())runBasket();
-}
+let curCityName='';
 async function loadCity(){
-  if($('#city').value==='__add'){$('#addCity').hidden=false;$('#newCity').focus();
-    const c=meta.cities.find(x=>x.name===curCityName)||meta.cities[0];if(c)$('#city').value=c.slug;return;}
-  $('#addCity').hidden=true;
-  const c=meta.cities.find(x=>x.slug===$('#city').value);LS.set('city',c.slug);curCityName=c.name;
-  $('#meta').textContent=`עודכן ${ago(meta.updated)}`;
-  if(c.error){data=null;$('#area').innerHTML='';$('#list').innerHTML=`<div class="err">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף דרך "➕ עיר אחרת".</span>`:''}</div>`;return;}
+  const sel=meta.cities.filter(c=>selCities.includes(c.slug));
+  if(!sel.length){data=null;$('#list').innerHTML='<div class="muted">בחרו עיר</div>';return;}
+  curCityName=sel[0].name; LS.set('city',sel[0].slug);
   $('#list').innerHTML='<div class="muted">טוען…</div>';
-  rawData=await (await fetch(`data/${c.slug}.json?`+Math.floor(c.updated||meta.updated))).json();
-  applyArea(c);
+  const ok=[], bad=[];
+  for(const c of sel){
+    if(c.error){bad.push(c);continue;}
+    try{ if(!cache[c.slug]) cache[c.slug]=await (await fetch(`data/${c.slug}.json?`+Math.floor(c.updated||meta.updated))).json(); ok.push({c,d:cache[c.slug]}); }
+    catch(e){bad.push({...c,error:'הנתונים לא נטענו'});}
+  }
+  const errHtml=bad.map(c=>`<div class="err" style="margin-bottom:8px">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף דרך "➕ עיר אחרת".</span>`:''}</div>`).join('');
+  if(!ok.length){data=null;$('#list').innerHTML=errHtml;$('#meta').textContent='';return;}
+  data=mergeCities(ok);
+  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${ok.length>1?` ב-${ok.length} ערים`:''} · עודכן ${ago(meta.updated)}`;
+  shown=60;draw(); if(errHtml) $('#list').insertAdjacentHTML('afterbegin',errHtml);
+  lastRes=null;selStore=null;if(tab==='basket'&&$('#blist').value.trim())runBasket();
 }
 function filtered(){
   const q=$('#q').value.trim().toLowerCase();
@@ -233,7 +237,6 @@ function draw(){
     d.innerHTML=it[3].map(e=>`<div><span>${esc(st[e[0]][0])} – ${esc(st[e[0]][1])}${staleTxt(e[0])?' <span class="sub">'+staleTxt(e[0])+'</span>':''}${e[2]?`<br><span class="promo">🏷️ ${esc(promoTxt(e))}</span>`:''}</span><span>${nis(e[1])}</span></div>`).join('');el.appendChild(d);});
   const m=$('#more');if(m)m.onclick=()=>{shown+=100;draw();};
 }
-$('#city').onchange=loadCity;
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
@@ -315,7 +318,7 @@ function runBasket(){
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
   let h='<h3>השוואה בין הסניפים</h3>';
   h+=res.stores.map((s,i)=>`<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}">
-     <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}${(data.stores[s.si][3]||0)>0?`<div class="sub">📍 ${data.stores[s.si][3]} ק"מ מהעיר</div>`:''}
+     <div class="top"><div><b>${esc(s.name)}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
      <div class="sub ${s.found<n?'miss':''}">${s.found===n?'כל הפריטים קיימים':`חסרים ${n-s.found} מתוך ${n} פריטים`}</div>
      ${s.rows.some(r=>r&&r.promo)?`<div class="promo">🏷️ כולל ${s.rows.filter(r=>r&&r.promo).length} מבצעים</div>`:''}
      ${staleTxt(s.si)?`<div class="sub">${staleTxt(s.si)}</div>`:''}
