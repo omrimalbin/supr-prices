@@ -119,7 +119,7 @@
   const dealKey = (it, o) => it[0] + "|" + o[0] + "|" + o[1];
 
   // המוצר הכי משתלם בסניף לכמות qty, כולל מבצעים.
-  // deals[key] = true/false – החלטת המשתמש על מבצע שדורש כמות גדולה יותר.
+  // deals[key] = false – מבצע כמות שהמשתמש דחה (לא להציע שוב). מימוש = הגדלת הכמות בשורה.
   function bestIn(cands, store, qty = 1, deals = {}) {
     let best = null, pending = null;
     for (const it of cands) {
@@ -132,9 +132,6 @@
         if (mq <= qty + 1e-9) {
           const n = Math.floor(qty / mq + 1e-9);
           opts.push({ cost: n * bundle + (qty - n * mq) * price, used: qty, promo: o });
-        } else if (deals[dealKey(it, o)] === true) {
-          const used = Math.ceil(qty / mq - 1e-9) * mq;
-          opts.push({ cost: used / mq * bundle, used, promo: o, bulk: true });
         } else if (deals[dealKey(it, o)] !== false) {
           const k = normKey(it, bundle / mq);
           if (!pending || k < pending.key) pending = { it, offer: o, key: k, price, mq, bundle, unit: bundle / mq };
@@ -155,7 +152,7 @@
     const byCode = new Map(data.items.map(it => [it[0], it]));
     const parsed = lines.map(l => {
       const q = parseLine(l.line);
-      if (l.qty) q.qty = l.qty;                 // כמות שהוגדלה בעקבות מבצע
+      if (l.qty) q.qty = Math.max(q.qty, l.qty);   // כמות שהוגדלה בעקבות מבצע
       const locked = l.pick && byCode.get(l.pick);
       return { ...l, q, cands: locked ? [locked] : candidates(data.items, q) };
     });

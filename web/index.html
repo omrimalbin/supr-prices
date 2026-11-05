@@ -162,6 +162,9 @@ let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},1
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
 const picks=JSON.parse(LS.get('picks','{}'));
 const deals=JSON.parse(LS.get('deals','{}'));      // מבצעים שנדחו: key -> false
+// אישורים מהגרסה הקודמת (true) היו "תקועים" בסניף אחד ובלי ביטול – מוחקים אותם
+for(const k in deals) if(deals[k]!==false) delete deals[k];
+LS.set('deals',JSON.stringify(deals));
 const qtyOv=JSON.parse(LS.get('qtyov','{}'));      // שורה -> {qty, orig, desc, where, key}
 function saveDeals(){LS.set('deals',JSON.stringify(deals));LS.set('qtyov',JSON.stringify(qtyOv));}
 function applyDeal(p,d,where){                      // מימוש מבצע: הגדלת הכמות בשורה – בכל הסניפים
@@ -189,6 +192,10 @@ function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return i
 function runBasket(){
   if(!data){$('#bres').innerHTML='<div class="muted">אין נתונים לעיר הזו</div>';return;}
   const ls=lines(); if(!ls.length){$('#bres').innerHTML='';return;}
+  const live=new Set(ls.map(keyOf)); let dirty=false;
+  for(const k in qtyOv) if(!live.has(k)){delete qtyOv[k];dirty=true;}   // שורה שנמחקה – המבצע שלה מתבטל
+  for(const l of ls){const k=keyOf(l); if(qtyOv[k]&&Match.parseLine(l).qty>=qtyOv[k].qty){delete qtyOv[k];dirty=true;}}  // הכמות שהוקלדה כבר מספיקה
+  if(dirty) saveDeals();
   const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)],qty:qtyOv[keyOf(l)]&&qtyOv[keyOf(l)].qty})),deals);lastRes=res;
   const n=ls.length;
   if(selStore==null) selStore=res.stores[0].si;
