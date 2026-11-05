@@ -112,6 +112,7 @@ def make_city(c, radius=0):
     area = own + [s for s, _ in near]
     if not area:
         raise RuntimeError(f'לא נמצאו סניפים בעיר "{c}"')
+    by_key = {(s["chain"], s["store"]): s for s in area}
     dist = {(s["chain"], s["store"]): 0 for s in own}
     dist.update({(s["chain"], s["store"]): d for s, d in near})
     print(f"{c}: {len(own)} סניפים בעיר + {len(near)} באזור (עד {radius:g} ק\"מ)")
@@ -138,7 +139,10 @@ def make_city(c, radius=0):
         k = (r["chain"], r["store"])
         if k not in idx:
             idx[k] = len(stores)
-            stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now, dist.get(k, 0)])
+            so = by_key.get(k, {})
+            addr = re.sub(r",?\s*Israel\s*$", "", (so.get("address") or "").strip(), flags=re.I)
+            stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now, dist.get(k, 0),
+                           addr, geo.store_city(so) if so else ""])
         it = items.get(r["barcode"])
         if it is None:
             size, unit = parse_size(r)
