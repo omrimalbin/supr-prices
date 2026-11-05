@@ -1,0 +1,12 @@
+name: בדיקת גישה לרשתות
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -s -m 10 https://ipinfo.io/json | head -8 || true
+          for u in https://shop.hazi-hinam.co.il/Prices https://laibcatalog.co.il/ https://prices.carrefour.co.il/ https://app.netiv-hesed.com/ https://prices.super-pharm.co.il/ https://prices.shufersal.co.il/; do
+            r=$(curl -s -L -m 25 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130 Safari/537.36" -o /tmp/b -w "%{http_code} %{size_download}" "$u" 2>&1 || echo "ERR $?")
+            echo "PROBE $u -> $r :: $(head -c 150 /tmp/b 2>/dev/null | tr '\n' ' ')"
+          done
