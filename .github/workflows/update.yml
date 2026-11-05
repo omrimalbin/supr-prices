@@ -57,6 +57,8 @@ jobs:
           id=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=israel-data&per_page=1" --jq '.artifacts[0].workflow_run.id // empty' || true)
           if [ -n "$id" ]; then gh run download "$id" -n israel-data -D israel || true; fi
           ls -la israel 2>/dev/null || echo "אין עדיין נתונים מהבית"
+      - name: קובצי המסך העדכניים ביותר (אם עודכנו בזמן שההרצה רצה)
+        run: git fetch -q origin main && git checkout origin/main -- web/ || true
       - name: שאיבת מחירים ובניית האתר
         env:
           SKIP_CHAINS: HAZI_HINAM,VICTORY_NEW_SOURCE,YAYNO_BITAN_AND_CARREFOUR,MAHSANI_ASHUK_NEW_SOURCE,SUPER_PHARM,NETIV_HASED,HET_COHEN_NEW_SOURCE
