@@ -131,6 +131,8 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 #modal[hidden]{display:none}.mbox{background:var(--card);color:var(--ink);border-radius:18px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:80vh;overflow:auto}
 .mtitle{font-weight:700;font-size:17px;margin-bottom:6px}#mmsg p{margin:8px 0;line-height:1.5;font-size:15px}
 #mok{display:block;width:100%;margin-top:12px;font:inherit;font-size:16px;font-weight:700;padding:11px;border:0;border-radius:12px;background:var(--accent);color:#fff}
+.stbtn{font-size:17px;border:1px solid var(--line);background:var(--card);border-radius:999px;width:38px;height:38px;margin-inline-start:auto;margin-inline-end:6px;padding:0;cursor:pointer}
+.stbtn.bad{border-color:#e0a03a;background:#fff4e0}.stbtn[hidden]{display:none}
 .homets{font-size:12px;margin-top:2px}.homets.old{color:#b45309}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
@@ -144,7 +146,7 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 h3{font-size:16px;margin:14px 0 8px}
 </style></head><body>
 <header>
-  <div class="hrow"><h1>מחירי סופר</h1><button class="areabtn" id="areaBtn">📍 <span id="areaName">…</span></button></div>
+  <div class="hrow"><h1>מחירי סופר</h1><button class="stbtn" id="stBtn" hidden aria-label="מצב העדכונים"></button><button class="areabtn" id="areaBtn">📍 <span id="areaName">…</span></button></div>
   <div class="muted" id="meta"></div>
   <div id="areaPop" hidden>
     <div class="muted" style="margin-bottom:2px">בחירת עיר (אפשר כמה יחד):</div>
@@ -231,7 +233,7 @@ h3{font-size:16px;margin:14px 0 8px}
   <button data-t="area"><span class="ic">📍</span>אזור</button>
 </nav>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
-<div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">אישור</button></div></div>
+<div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">הבנתי</button><div class="muted" style="text-align:center;margin-top:8px;font-size:12px">ההודעה לא תקפוץ שוב עד שיהיה שינוי. אפשר לראות אותה בכל רגע בכפתור הקטן למעלה.</div></div></div>
 <div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
 <script src="match.js"></script>
 <script>
@@ -336,12 +338,21 @@ async function checkStatus(){
     }catch(e){}
   }));
   // נתונים ישנים מדי (העדכון האוטומטי אמור לרוץ כל 6 שעות)
+  if(meta.updated&&Date.now()/1000-meta.updated>14*3600) info.push('🕰️ מחירים ישנים');
   if(meta.updated&&Date.now()/1000-meta.updated>14*3600) out.push(`🕰️ המחירים לא התעדכנו כבר ${ago(meta.updated).replace('לפני ','')}.`);
   const ht=homeTs();
+  if(ht&&Date.now()/1000-ht>HOME_OLD) info.push('🏠 רשתות מהבית לא עודכנו יום');
   if(ht&&Date.now()/1000-ht>HOME_OLD&&!out.some(x=>x.startsWith('⏳ השאיבה'))) out.push(`🏠 ויקטורי, קרפור וסופר-פארם עודכנו לאחרונה ${ago(ht)}. כדי לעדכן אותם צריך להדליק את המחשב בבית.`);
   const ui=$('#updInfo'); if(ui){ const hl=ht?`🏠 ויקטורי, קרפור וסופר-פארם (מהמחשב בבית): עודכנו ${ago(ht)}`:''; ui.innerHTML=esc(ui.textContent)+[hl,...info].filter(Boolean).map(x=>'<br>'+esc(x)).join(''); }
-  if(!out.length) return;
-  showModal(out.map(x=>`<p>${x}</p>`).join(''));
+  // תצוגה ידידותית: כפתור קטן בראש המסך תמיד (כשיש מה לדווח); חלון קופץ רק כשמשהו חדש –
+  // תקלה / המתנה למחשב / נתונים ישנים שעוד לא אישרת. עדכון שרץ עכשיו – רק בכפתור.
+  const bt=$('#stBtn');
+  if(!out.length){ bt.hidden=true; LS.set('ackStatus',''); return; }
+  const bad=info.some(x=>/^⚠️/.test(x)), html=out.map(x=>`<p>${x}</p>`).join('');
+  bt.textContent=bad?'⚠️':info.every(x=>/^🔄/.test(x))?'🔄':'⏳'; bt.classList.toggle('bad',bad); bt.hidden=false;
+  bt.onclick=e=>{e.stopPropagation();showModal(html);};
+  const sig=info.filter(x=>!/^🔄/.test(x)).sort().join('|');
+  if(sig&&sig!==LS.get('ackStatus','')){ showModal(html); $('#mok').onclick=()=>{$('#modal').hidden=true;LS.set('ackStatus',sig);}; }
 }
 function storeNotes(list){ // סניפים חדשים בעיר מאז הביקור הקודם
   for(const {c,d} of list){
@@ -678,12 +689,22 @@ const regOf=r=>r.price*r.used*(r.actual!=null&&r.actual>0?r.cost/r.actual:1);
 function adjNote(r,p){ if(!r.adjusted) return '';
   const want=p.q.size*p.q.qty;
   return `<div class="adj">⚖️ המחיר מותאם ל־${wTxt(want)}, כדי להשוות אותה כמות בכל הסופרים.<br>בפועל קונים ${r.used>1?r.used+' × ':''}${wTxt(r.it[4])}${r.used>1?' = '+wTxt(r.actualG):''} ב־${nis(r.actual)}</div>`;}
-function showResults(cmp,deals){
+function showResults(cmp,deals,fromCache){
   $('#bres').innerHTML=cmp; $('#bempty').hidden=!!cmp;
   $('#pres').innerHTML=deals; $('#pempty').hidden=!!deals;
   $('#bdg-deals').textContent=deals&&window._dealCount?window._dealCount:'';
+  if(!fromCache) try{ LS.set('lastCmp',JSON.stringify({l:$('#blist').value,c:selCities.join(','),cmp,deals,n:window._dealCount||0})); }catch(e){}
+}
+// פתיחה מהירה: ההשוואה האחרונה מוצגת מיד, ומתעדכנת כשהנתונים נטענים
+function restoreCmp(){
+  try{ const x=JSON.parse(LS.get('lastCmp','null')); if(!x||!x.cmp||x.l!==$('#blist').value||x.c!==selCities.join(',')) return;
+    window._dealCount=x.n; showResults(x.cmp,x.deals,true); compared=true;
+    $('#bres').insertAdjacentHTML('afterbegin','<div class="muted refreshing">⏳ מעדכן למחירים העדכניים…</div>');
+    $('#bres').style.pointerEvents='none';
+  }catch(e){}
 }
 function runBasket(){
+  $('#bres').style.pointerEvents='';
   if(!data){showResults('<div class="muted">אין נתונים לעיר הזו</div>','');return;}
   const ls=lines(); if(!ls.length){compared=false;showResults('','');return;}
   compared=true;
@@ -828,6 +849,7 @@ $('#installBtn').onclick=async()=>{ if(!deferred)return; deferred.prompt(); awai
 $('#installX').onclick=()=>{ LS.set('noInstall','1'); $('#install').style.display='none'; };
 addEventListener('appinstalled',()=>{$('#install').style.display='none';});
 
+restoreCmp();
 setTab(tab);
 renderItems();
 init().catch(e=>$('#list').innerHTML=`<div class="err">הנתונים עוד לא מוכנים – ההרצה הראשונה לוקחת כחצי שעה. (${esc(e.message)})</div>`);
