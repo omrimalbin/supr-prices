@@ -74,6 +74,7 @@ def slug(city):
 
 
 DEFAULT_RADIUS = 0
+MAX_NEAR = 70
 
 
 def parse_city_line(line):
@@ -109,6 +110,9 @@ def make_city(c, radius=0):
         A.update_stores()
     own = A.city_stores(c)
     near = geo.nearby_stores(c, radius, exclude=own) if radius else []
+    if len(near) > MAX_NEAR:                       # רדיוס גדול: הסניפים הקרובים ביותר בלבד, כדי שהנתונים יישארו קלים לטלפון
+        print(f"{c}: {len(near)} סניפים באזור – נשמרים {MAX_NEAR} הקרובים")
+        near = near[:MAX_NEAR]
     area = own + [s for s, _ in near]
     if not area:
         raise RuntimeError(f'לא נמצאו סניפים בעיר "{c}"')
@@ -249,6 +253,15 @@ def main():
         n = geo.store_city(s_)
         if n:
             all_cities[n] = all_cities.get(n, 0) + 1
+    # קואורדינטות לכל יישוב שיש בו סניפים – לאפליקציה (מציאת היישוב הקרוב למיקום הנוכחי)
+    locs = {}
+    for n in all_cities:
+        xy = geo.coords(n)
+        if xy:
+            locs[n] = xy
+    geo.save()
+    (SITE / "data" / "localities.json").write_text(json.dumps(locs, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"מיקומים: {len(locs)} יישובים")
 
     meta = []
     for c, radius in cities.items():
