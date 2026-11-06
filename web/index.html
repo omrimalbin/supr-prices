@@ -265,6 +265,7 @@ async function init(){
   $('#updInfo').textContent=`המחירים מתעדכנים לבד כל 6 שעות. עדכון אחרון: ${ago(meta.updated)}.`;
   setTab(tab);
   updateNotes();
+  checkStatus();
   selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
   if(!selCities.length&&meta.cities.length) selCities=[meta.cities[0].slug];
   drawCities();
@@ -285,9 +286,9 @@ function requestCity(name,r=0){
 $('#newCityBtn').onclick=()=>requestCity($('#newCity').value);
 $('#newCity').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();requestCity($('#newCity').value);}};
 // ---- הודעה על עדכונים שהסתיימו ----
-function notify(html,onTap){
+function notify(html,onTap,ms){
   $('#tmsg').innerHTML=html; $('#toast').hidden=false;
-  clearTimeout(notify.t); notify.t=setTimeout(()=>$('#toast').hidden=true,8000);
+  clearTimeout(notify.t); notify.t=setTimeout(()=>$('#toast').hidden=true,ms||8000);
   $('#tmsg').onclick=()=>{$('#toast').hidden=true; if(onTap) onTap();};
 }
 $('#tclose').onclick=()=>$('#toast').hidden=true;
@@ -298,6 +299,36 @@ function updateNotes(){    // עיר חדשה + עדכון מחירים מאז �
     if(nw.length) notes.push(`🏙️ נוספה ${nw.length>1?'ערים':'עיר'}: <b>${nw.map(esc).join(', ')}</b>`); }
   if(seenAt&&meta.updated>seenAt+60) notes.push(`🔄 המחירים עודכנו ${ago(meta.updated)}`);
   LS.set('seenUpdate',String(meta.updated)); LS.set('seenCities',JSON.stringify(meta.cities.map(c=>c.name)));
+}
+// ---- מצב העדכונים ב-GitHub: תקלה, עדכון שרץ עכשיו או שממתין (למשל למחשב בבית) ----
+const WF={'update.yml':'עדכון המחירים','israel.yml':'השאיבה מהמחשב בבית','deploy-app.yml':'פרסום האפליקציה'};
+async function checkStatus(){
+  if(!meta||!meta.repo||checkStatus.done) return; checkStatus.done=true;
+  const out=[], info=[];
+  await Promise.all(Object.keys(WF).map(async f=>{
+    try{
+      const r=await fetch(`https://api.github.com/repos/${meta.repo}/actions/workflows/${f}/runs?per_page=6`,{cache:'no-store'});
+      if(!r.ok) return; const runs=(await r.json()).workflow_runs||[];
+      const act=runs.find(x=>x.status!=='completed'), t=x=>new Date(x.created_at).getTime()/1000;
+      const last=runs.find(x=>x.status==='completed'&&!['cancelled','skipped'].includes(x.conclusion));
+      if(act&&f!=='deploy-app.yml'){   // פרסום האפליקציה קצר – רק תקלות שלו מעניינות
+        const waitMin=(Date.now()/1000-t(act))/60;
+        if(act.status==='in_progress') { out.push(`🔄 ${WF[f]} רץ עכשיו (התחיל ${ago(t(act))}). המחירים יתעדכנו כשיסתיים.`); info.push(`🔄 ${WF[f]} רץ עכשיו`); }
+        else if(f==='israel.yml'&&waitMin>30) { out.push(`⏳ ${WF[f]} ממתינה ${ago(t(act)).replace('לפני ','כבר ')} – כנראה המחשב כבוי. כשיידלק, ויקטורי, קרפור וסופר-פארם יתעדכנו.`); info.push(`⏳ ${WF[f]} ממתינה למחשב`); }
+        else if(f!=='israel.yml') { out.push(`⏳ ${WF[f]} בתור, יתחיל בקרוב.`); info.push(`⏳ ${WF[f]} בתור`); }
+      }
+      if(last&&last.conclusion==='failure'&&!(act&&act.status==='in_progress')){
+        out.push(`⚠️ ${WF[f]} האחרון נכשל (${ago(new Date(last.updated_at).getTime()/1000)}). המחירים שמוצגים הם מהעדכון המוצלח הקודם.`);
+        info.push(`⚠️ ${WF[f]} האחרון נכשל`);
+      }
+    }catch(e){}
+  }));
+  // נתונים ישנים מדי (העדכון האוטומטי אמור לרוץ כל 6 שעות)
+  if(meta.updated&&Date.now()/1000-meta.updated>14*3600) out.push(`🕰️ המחירים לא התעדכנו כבר ${ago(meta.updated).replace('לפני ','')}.`);
+  const ui=$('#updInfo'); if(ui&&info.length) ui.innerHTML=esc(ui.textContent)+'<br>'+info.map(esc).join('<br>');
+  if(!out.length) return;
+  const show=()=>notify(out.join('<br>'),()=>setTab('area'),15000);
+  if(!$('#toast').hidden) setTimeout(show,6000); else show();
 }
 function storeNotes(list){ // סניפים חדשים בעיר מאז הביקור הקודם
   for(const {c,d} of list){
