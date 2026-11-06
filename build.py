@@ -147,12 +147,18 @@ def make_city(c, radius=0):
             addr = re.sub(r",?\s*Israel\s*$", "", (so.get("address") or "").strip(), flags=re.I)
             stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now, dist.get(k, 0),
                            addr, geo.store_city(so) if so else ""])
-        it = items.get(r["barcode"])
+        size, unit = parse_size(r)
+        ik = item_key(r, unit)
+        it = items.get(ik)
         if it is None:
-            size, unit = parse_size(r)
-            it = items[r["barcode"]] = [r["barcode"], r["name"], r["manu"], [], size, unit]
+            it = items[ik] = [ik, r["name"], r["manu"], [], size, unit]
         if not it[1]:
             it[1] = r["name"]
+        dup = next((x for x in it[3] if x[0] == idx[k]), None)
+        if dup is not None:                   # אותו מוצר פנימי פעמיים באותו סניף – נשאר הזול
+            if pr >= dup[1]:
+                continue
+            it[3].remove(dup)
         pe = [idx[k], round(pr, 2)]
         offers = {}
         for mq, bundle, rate, desc in promo_by_store.get(k, {}).get(r["barcode"], []):
@@ -173,6 +179,27 @@ def make_city(c, radius=0):
         it[3].append(pe)
     return {"stores": stores, "items": list(items.values()), "promos": descs,
             "n_city_stores": len(area), "n_promo": npromo}
+
+
+def internal_code(r):
+    """קוד פנימי של הרשת (ירקות, פירות, מעדנייה, שקילים) – לא ברקוד אמיתי.
+    אותו מספר מסמן מוצרים שונים ברשתות שונות (למשל 7290000000091 = פלפל אדום בשופרסל
+    ומוצר אחר ברמי לוי), ואותו מוצר מקבל מספר אחר בכל רשת."""
+    code = r["barcode"]
+    return len(code) < 8 or code.startswith("7290000000") or (r.get("itype") == "0" and len(code) < 13)
+
+
+def item_key(r, unit):
+    """מפתח המוצר: ברקוד אמיתי – הברקוד. קוד פנימי – השם המנורמל + יחידת המידה,
+    כך שפלפל צהוב משופרסל, רמי לוי ויוחננוף נאחד למוצר אחד, ושני מוצרים שונים עם אותו קוד לא יתערבבו."""
+    if not internal_code(r):
+        return r["barcode"]
+    nm = re.sub(r"\*?מבצע\*?", " ", r["name"] or "")
+    nm = re.sub(r"[^\w%]+", " ", nm).strip()
+    nm = re.sub(r"\s+", " ", nm)
+    if not nm:
+        return f'~{r.get("chain", "")}:{r["barcode"]}'
+    return f"~{nm}|{unit}"
 
 
 def merge(base, extra):

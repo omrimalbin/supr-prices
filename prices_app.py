@@ -356,6 +356,7 @@ FIELDS = [
     ("w", ["bisweighted", "blsweighted"]),
     ("uq", ["unitqty"]),
     ("uom", ["unitofmeasure"]),
+    ("itype", ["itemtype"]),
 ]
 
 

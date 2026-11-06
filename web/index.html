@@ -413,7 +413,7 @@ function draw(){
   const st=data.stores;
   $('#list').innerHTML=(r.length?'':'<div class="muted">לא נמצאו מוצרים</div>')+r.slice(0,shown).map((it,i)=>`<div class="item" data-i="${i}">
     <div class="top"><div><div class="name">${inListBadge(it[0])}${esc(it[1]||'(ללא שם)')}</div>
-    <div class="sub">${it[2]?esc(it[2])+' · ':''}<span class="bc">${esc(it[0])}</span></div>
+    <div class="sub">${it[2]?esc(it[2])+' · ':''}${it[0][0]==='~'?'<span class="bc">קוד פנימי של הרשת</span>':`<span class="bc">${esc(it[0])}</span>`}</div>
     <div class="sub">הכי זול ב<b>${esc(stTitle(it[3][0][0]))}</b>${it.n>1?` · עד ${nis(it.max)} · ${it.n} סניפים`:''}</div><div class="locline">📍 ${esc(storeLabel(st[it[3][0][0]]).loc)}</div></div>
     <div class="price">${nis(it.min)}</div></div>${it[3].some(e=>e[2])?'<div class="promo">🏷️ יש מבצע</div>':''}</div>`).join('')
     +(r.length>shown?`<button class="more" id="more">הצגת עוד (${(r.length-shown).toLocaleString('he-IL')})</button>`:'');
