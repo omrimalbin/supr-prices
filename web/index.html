@@ -134,6 +134,13 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .stbtn{font-size:17px;border:1px solid var(--line);background:var(--card);border-radius:999px;width:38px;height:38px;margin-inline-start:auto;margin-inline-end:6px;padding:0;cursor:pointer}
 .stbtn.bad{border-color:#e0a03a;background:#fff4e0}.stbtn[hidden]{display:none}
 .homets{font-size:12px;margin-top:2px}.homets.old{color:#b45309}
+.qrow{display:flex;gap:8px;align-items:center}.qrow input{flex:1}
+.scanbtn{flex:none;width:48px;height:46px;font-size:22px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0;cursor:pointer}
+#scan{position:fixed;inset:0;z-index:60;background:#000;display:flex;align-items:center;justify-content:center}#scan[hidden]{display:none}
+#scanV{width:100%;height:100%;object-fit:cover}
+.sframe{position:absolute;left:10%;right:10%;top:calc(50% - 25%);height:50%;max-height:240px;top:calc(50% - 120px);border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.stxt{position:absolute;bottom:calc(60px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:16px;text-shadow:0 1px 4px #000}
+#scanX{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:20px}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
 .locline{display:block;font-size:12px;color:var(--muted);font-weight:400}
@@ -180,7 +187,7 @@ h3{font-size:16px;margin:14px 0 8px}
 
 <!-- 🔍 מוצרים -->
 <section class="pane" id="p-prod" hidden>
-  <input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…">
+  <div class="qrow"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"><button id="scanBtn" class="scanbtn" aria-label="סריקת ברקוד">📷</button></div>
   <div class="muted" id="swipeHint" style="margin:6px 0 2px">💡 החליקו מוצר ימינה או שמאלה כדי להוסיף אותו לרשימת הקניות.</div>
   <div class="chips" id="sorts">
     <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
@@ -233,6 +240,8 @@ h3{font-size:16px;margin:14px 0 8px}
   <button data-t="area"><span class="ic">📍</span>אזור</button>
 </nav>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
+<div id="scan" hidden><video id="scanV" playsinline muted autoplay></video><div class="sframe"></div>
+  <div class="stxt" id="scanTxt">כוונו את המצלמה לברקוד של המוצר</div><button id="scanX" aria-label="סגירה">✕</button></div>
 <div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">הבנתי</button><div class="muted" style="text-align:center;margin-top:8px;font-size:12px">ההודעה לא תקפוץ שוב עד שיהיה שינוי. אפשר לראות אותה בכל רגע בכפתור הקטן למעלה.</div></div></div>
 <div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
 <script src="match.js"></script>
@@ -509,6 +518,46 @@ function addProduct(it){
   picks[k]=it[0]; delete tmpPicks[k]; LS.set('picks',JSON.stringify(picks));
   setLines(ls); notify(`🛒 נוסף לרשימה: <b>${esc(nm)}</b>${j>=0?` · סה״כ ${effQty(lines()[j])}`:''}`);
 }
+// ---- סריקת ברקוד במצלמה: BarcodeDetector מובנה (אנדרואיד), ואחרת ZXing (אייפון) – נטען רק כשצריך ----
+let scanStream=null, scanOn=false;
+function loadZX(){ return window.ZXing?Promise.resolve():new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='zxing.min.js';sc.onload=ok;sc.onerror=no;document.head.appendChild(sc);}); }
+function stopScan(){ scanOn=false; if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;} $('#scan').hidden=true; }
+async function openScanner(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){notify('הדפדפן לא מאפשר גישה למצלמה');return;}
+  $('#scan').hidden=false; $('#scanTxt').textContent='כוונו את המצלמה לברקוד של המוצר';
+  try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false}); }
+  catch(e){ stopScan(); notify('אין גישה למצלמה. אפשר לאשר גישה בהגדרות הדפדפן ולנסות שוב.'); return; }
+  const v=$('#scanV'); v.srcObject=scanStream; try{await v.play();}catch(e){}
+  scanOn=true;
+  let detect;
+  if('BarcodeDetector' in window){
+    try{ const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}); detect=async()=>{const r=await det.detect(v);return r[0]&&r[0].rawValue;}; }catch(e){}
+  }
+  if(!detect){
+    try{ await loadZX(); }catch(e){ stopScan(); notify('לא הצלחתי לטעון את סורק הברקודים'); return; }
+    const Z=window.ZXing, hints=new Map();
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128]);
+    hints.set(Z.DecodeHintType.TRY_HARDER,true);
+    const rd=new Z.MultiFormatReader(); rd.setHints(hints);
+    const cv=document.createElement('canvas'), cx=cv.getContext('2d',{willReadFrequently:true});
+    detect=async()=>{ const w=v.videoWidth,h=v.videoHeight; if(!w) return null;
+      const cw=Math.round(w*0.8), ch=Math.round(h*0.5); cv.width=cw; cv.height=ch;   // רק המרכז – מהיר יותר
+      cx.drawImage(v,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cw,ch);
+      try{ return rd.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText(); }catch(e){ return null; } };
+  }
+  const loop=async()=>{ if(!scanOn) return; let code=null; try{ code=await detect(); }catch(e){}
+    if(code&&/^\d{6,14}$/.test(code)){ foundCode(code); return; } setTimeout(loop,120); };
+  loop();
+}
+function foundCode(code){
+  stopScan(); if(navigator.vibrate) navigator.vibrate(60);
+  // בנתונים ברקוד יכול להופיע עם/בלי אפסים מובילים (UPC-A / EAN-13)
+  let q=code; if(data&&!data.items.some(it=>it[0]===q)){ const s=code.replace(/^0+/,''); const hit=data.items.find(it=>it[0].replace(/^0+/,'')===s); if(hit) q=hit[0]; }
+  $('#q').value=q; shown=60; draw();
+  if(data&&!data.items.some(it=>it[0]===q)) notify(`הברקוד ${esc(code)} לא נמכר בסניפים שבחרת`);
+}
+$('#scanBtn').onclick=openScanner; $('#scanX').onclick=stopScan;
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&scanOn) stopScan(); });
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
