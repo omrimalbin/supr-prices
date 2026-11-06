@@ -15,6 +15,29 @@
   // מילים שמופיעות בתחילת שם מוצר לפני הסוג עצמו
   const LEAD = new Set(["דגני", "בוקר", "מארז", "שישיית", "שישייה", "רביעיית", "רביעייה", "זוג", "מגש", "שקית", "חבילת",
     "טרי", "טריה", "טריים", "מהדרין", "מבחר", "יטבתה", "תנובה", "שטראוס", "טרה", "אסם", "עלית", "תלמה", "מותג", "חדש", "מבצע"]);
+  // מילים נרדפות / חלופות (אחרי נרמול: ם->מ, בלי גרשיים). כל מילה בשורה מתאימה גם לחלופות שלה.
+  const SYN = {
+    "אוטס": ["שיבולת"], "שיבולת": ["אוטס"], "טבעוני": ["טבעונית", "צמחי", "צמחית"], "טבעונית": ["טבעוני", "צמחי", "צמחית"],
+    "צמחי": ["טבעוני", "טבעונית", "צמחית"], "צמחית": ["טבעוני", "טבעונית", "צמחי"],
+    "חיתולימ": ["טיטולימ"], "טיטולימ": ["חיתולימ"], "כלור": ["אקונומיקה"], "אקונומיקה": ["כלור"],
+    "סודה": ["מוגזימ", "מוגז"], "נוזל": ["סבונ"], "שמפו": ["שמפו"], "טונה": ["טונה"],
+    "לחמניות": ["לחמניה", "לחמנייה"], "פיתות": ["פיתה", "פיתה"], "קטשופ": ["קטשופ", "קאטשופ"], "קאטשופ": ["קטשופ"],
+    "צ׳יפס": ["ציפס"], "קוטג": ["קוטג"], "ספגטי": ["ספגטי"], "פרגיות": ["פרגית"], "שניצל": ["שניצלונימ"],
+  };
+  // "חלב סויה" נקרא בחנות "משקה סויה": מוצרים מהצומח שמחליפים מוצרי חלב
+  const PLANT = ["סויה", "שקדימ", "שקד", "שיבולת", "אוטס", "אורז", "קוקוס", "קשיו", "אגוזימ", "אפונה", "טבעוני", "טבעונית", "צמחי", "צמחית", "שועל"];
+  const PLANT_SYN = { "חלב": ["משקה"], "יוגורט": ["מעדנ", "יוגורט"], "גבינה": ["גבינה"], "שמנת": ["תחליפ"] };
+  // צורות שנראות כמו המילה אבל הן מוצר אחר
+  const NOT_FORM = { "חלב": ["חלבה"], "שמנת": ["שמנ"] };
+  function alts(t, toks) {
+    const a = [t, ...(SYN[t] || [])];
+    if (PLANT_SYN[t] && toks.some(x => PLANT.includes(x))) a.push(...PLANT_SYN[t]);
+    return a;
+  }
+  // התאמת מילה לשם מוצר (כל המילים, בכל סדר, כולל חלופות)
+  function groupsOf(toks) { return toks.map(t => alts(t, toks)); }
+  function wordIn(ws, g) { return ws.some(w => g.some(t => wordMatches(w, t) && !(NOT_FORM[t] || []).includes(w))); }
+  function matchAll(it, groups) { return groups.every(g => wordIn(it.words, g)); }
   const SUF = ["", "ה", "ת", "ות", "ימ", "י", "ית", "יות", "יימ", "ייה", "יה"];   // אחרי נרמול: ם -> מ
 
   const UNIT_RE = [
@@ -74,19 +97,22 @@
     // מילות קישור לא מחייבות התאמה ("קורנפלקס של אלופים")
     const toks = q.text.split(" ").filter(t => t && !STOP.has(t));
     if (!toks.length) return [];
+    const groups = groupsOf(toks), allT = groups.flat();
     let res = items.filter(it => {
       const ws = it.words;
-      if (!toks.every(t => ws.some(w => wordMatches(w, t)))) return false;
+      if (!matchAll(it, groups)) return false;
       for (const w of ws) {
-        for (const ex of EXCL) if (w.startsWith(ex) && !toks.some(t => t.startsWith(ex))) return false;
+        for (const ex of EXCL) if (w.startsWith(ex) && !allT.some(t => t.startsWith(ex))) return false;
         if (EXACT.includes(w) && !toks.includes(w)) return false;
       }
       return true;
     });
+    // "חלב קוקוס" – לא מי קוקוס
+    if (toks.includes("חלב") && toks.some(x => PLANT.includes(x))) res = res.filter(it => !it.words.includes("מי"));
     // מעדיפים מוצרים ששמם מתחיל במילה הראשונה ("חלב 3%" ולא "קפה עם חלב")
     // (מדלגים על מילות פתיחה כלליות: "דגני בוקר קורנפלקס", "מארז במבה", "חלב טרי")
     const firstReal = ws => { let i = 0; while (i < ws.length - 1 && LEAD.has(ws[i])) i++; return ws[i]; };
-    const head = res.filter(it => wordMatches(firstReal(it.words), toks[0]) || wordMatches(it.words[0], toks[0]));
+    const head = res.filter(it => groups[0].some(t => wordMatches(firstReal(it.words), t) || wordMatches(it.words[0], t)));
     if (head.length) res = head;
     // מוצרים שקילים (מחיר לק"ג): רק לירקות/פירות/בשר בסיסיים (שם קצר), או כשאין חלופה ארוזה
     if (res.some(it => it[5] !== "kg")) res = res.filter(it => it[5] !== "kg" || it.words.length <= 4);
@@ -254,6 +280,19 @@
     return out.sort((a, b) => a.rank - b.rank);
   }
 
-  const api = { norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, dealsFor, compareBasket, prep };
+  // חיפוש חופשי בלשונית המוצרים: כל המילים בכל סדר, עם צורות (יחיד/רבים) וחלופות
+  function search(items, text) {
+    prep(items);
+    const toks = norm(text).split(" ").filter(t => t && !STOP.has(t));
+    if (!toks.length) return items.slice();
+    const groups = groupsOf(toks);
+    const loose = g => it => it.words.some(w => g.some(t => t.length >= 3 && w.includes(t)));
+    const res = items.filter(it => groups.every(g => wordIn(it.words, g) || loose(g)(it) || (it[2] && norm(it[2]).includes(g[0]))));
+    // רלוונטיות: מילים שלמות לפני חלקי מילה, ושם שמתחיל במילה הראשונה – קודם
+    for (const it of res) it._rel = groups.reduce((a, g) => a + (wordIn(it.words, g) ? 2 : 0), 0)
+      + (g0 => g0.some(t => wordMatches(it.words[0], t)) ? 1 : 0)(groups[0]);
+    return res.sort((a, b) => b._rel - a._rel);
+  }
+  const api = { search, norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, dealsFor, compareBasket, prep };
   if (typeof module !== "undefined") module.exports = api; else root.Match = api;
 })(this);

@@ -459,9 +459,10 @@ async function loadCity(){
 }
 function filtered(){
   const q=$('#q').value.trim().toLowerCase();
-  let r=q?data.items.filter(it=>it[1].toLowerCase().includes(q)||it[0].includes(q)||(it[2]||'').toLowerCase().includes(q)):data.items.slice();
+  let r=q?(/^\d{4,}$/.test(q.trim())?data.items.filter(it=>it[0].includes(q.trim())):Match.search(data.items,q)):data.items.slice();
   const f={name:(a,b)=>a[1].localeCompare(b[1],'he'),cheap:(a,b)=>a.min-b.min,gap:(a,b)=>(b.max-b.min)-(a.max-a.min),n:(a,b)=>b.n-a.n}[sort];
-  return r.sort(f);
+  // בחיפוש: קודם הרלוונטיים ביותר, ובתוך כל רמה – לפי המיון שנבחר
+  return q?r.sort((a,b)=>((b._rel||0)-(a._rel||0))||f(a,b)):r.sort(f);
 }
 function draw(){
   if(!data)return;
