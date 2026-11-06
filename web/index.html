@@ -730,7 +730,8 @@ function runBasket(){
   cmpSel=cmpSel.filter(si=>res.stores.some(s=>s.si===si));
   if(cmpSel.length===1) h+='<div class="muted" style="margin:4px 0 8px">סמנו עוד סניף אחד או שניים כדי לראות טבלת השוואה.</div>';
   if(cmpSel.length>=2){
-    const cs=cmpSel.map(si=>res.stores.find(s=>s.si===si));
+    // הזול ביותר בעמודה הראשונה (מימין), אחריו לפי הסדר; סניף שחסרים בו מוצרים – בסוף
+    const cs=cmpSel.map(si=>res.stores.find(s=>s.si===si)).sort((a,b)=>(b.found-a.found)||(a.total-b.total));
     h+=`<h3 id="ctabH">טבלת השוואה</h3><div class="ctabw"><table class="ctab"><thead><tr><th>מוצר</th>${cs.map(s=>`<th>${esc(stTitle(s.si))}<div class="loc">${esc(storeLabel(data.stores[s.si]).loc)}</div></th>`).join('')}</tr></thead><tbody>`;
     h+=res.parsed.map((p,i)=>{const rs=cs.map(s=>s.rows[i]); const ok=rs.filter(Boolean).map(r=>r.cost); const mn=ok.length>1?Math.min(...ok):null;
       return `<tr><td class="cn">${esc(p.line)}</td>${rs.map(r=>r?`<td class="${mn!=null&&r.cost<=mn+0.005?'best':''}"><b>${nis(r.cost)}</b>${r.promo?' 🏷️':''}<div class="cp">${esc(r.it[1])}</div>${r.adjusted?`<div class="cp adjc">⚖️ מותאם · בפועל ${wTxt(r.actualG)} ב־${nis(r.actual)}</div>`:''}</td>`:'<td class="na">—<div class="cp">לא נמכר</div></td>').join('')}</tr>`;}).join('');
