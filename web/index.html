@@ -592,7 +592,23 @@ function foundCode(code){
   // בנתונים ברקוד יכול להופיע עם/בלי אפסים מובילים (UPC-A / EAN-13)
   let q=code; if(data&&!data.items.some(it=>it[0]===q)){ const s=code.replace(/^0+/,''); const hit=data.items.find(it=>it[0].replace(/^0+/,'')===s); if(hit) q=hit[0]; }
   $('#q').value=q; shown=60; draw();
-  if(data&&!data.items.some(it=>it[0]===q)) notify(`הברקוד ${esc(code)} לא נמכר בסניפים שבחרת`);
+  if(data&&!data.items.some(it=>it[0]===q)) similarFor(code);
+}
+// המוצר לא נמכר בסניפים שנבחרו: מחפשים את שמו (מכל הערים) ומציגים מוצרים דומים
+let namesP=null;
+async function similarFor(code){
+  let nm=null;
+  try{ namesP=namesP||fetch(`data/names.json?${Math.round(meta.updated||0)}`).then(r=>r.ok?r.json():{}); const nmap=await namesP;
+    nm=nmap[code]||nmap[code.replace(/^0+/,'')]||nmap['0'+code]; }catch(e){}
+  if(!nm){ notify(`הברקוד ${esc(code)} לא נמכר בסניפים שבחרת, ולא מצאתי אותו גם בערים האחרות.`,null,10000); return; }
+  // מחפשים לפי השם, ומורידים מילים מהסוף (מותג, אריזה) עד שיש תוצאות
+  // בלי גודל האריזה (2 ליטר, 500 גרם...) – אותו מוצר נמכר בגדלים אחרים
+  const clean=nm.replace(/\*?מבצע\*?/g,' ').replace(/\d+(?:[.,]\d+)?\s*(?:ליטר|ל['׳]?|מ["״]?ל|מל|גרם|גר|ג['׳]?|ק["״]?ג|קילו|יח(?:ידות|['׳])?)(?![א-ת])/g,' ')
+    .replace(/[-–,*`'"״׳()]/g,' ').replace(/\b\d+\b/g,' ').replace(/\s+/g,' ').trim(), ws=clean.split(' ');
+  let qq=clean, n=0;
+  for(let k=ws.length;k>=1;k--){ qq=ws.slice(0,k).join(' '); n=Match.search(data.items,qq).length; if(n) break; }
+  if(n){ $('#q').value=qq; shown=60; draw(); }
+  notify(`📦 <b>${esc(nm)}</b> לא נמכר בסניפים שבחרת.${n?` הנה מוצרים דומים (${n}):`:''}`,null,10000);
 }
 $('#scanBtn').onclick=openScanner; $('#scanX').onclick=stopScan;
 $('#scanFile').onchange=e=>{const f=e.target.files[0]; e.target.value=''; scanPhoto(f);};

@@ -319,6 +319,17 @@ def main():
         meta.append(entry)
     geo.save()
 
+    # שמות לפי ברקוד מכל הערים – כדי שסריקת מוצר שלא נמכר בעיר שנבחרה תציג מה הוא ותציע מוצרים דומים
+    names = {}
+    for m in meta:
+        f = SITE / "data" / f"{m['slug']}.json"
+        if not f.exists():
+            continue
+        for it in json.loads(f.read_text(encoding="utf-8"))["items"]:
+            if it[0] and it[0][0] != "~" and it[1]:
+                names.setdefault(it[0], it[1])
+    (SITE / "data" / "names.json").write_text(json.dumps(names, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
     (SITE / "data" / "stores.json").write_text(json.dumps(
         [[s["chain"], s["store"], s["sname"], s["city"], s["address"]] for s in A.load_stores()],
         ensure_ascii=False), encoding="utf-8")
