@@ -524,64 +524,88 @@ function addProduct(it){
 }
 // ---- סריקת ברקוד במצלמה: BarcodeDetector מובנה (אנדרואיד), ואחרת ZXing (אייפון) – נטען רק כשצריך ----
 let scanStream=null, scanOn=false;
-function loadZX(){ return window.ZXing?Promise.resolve():new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='zxing.min.js';sc.onload=ok;sc.onerror=no;document.head.appendChild(sc);}); }
 function stopScan(){ scanOn=false; if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;} $('#scan').hidden=true; }
-// מפענח ברקוד מתוך canvas עם ZXing: כמה חיתוכים ושני סוגי עיבוד – מגדיל מאוד את סיכויי הזיהוי
-let zxReader=null;
-function zxDecode(src,w,h,round){
-  const Z=window.ZXing; if(!zxReader){ const hints=new Map();
-    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128]);
-    hints.set(Z.DecodeHintType.TRY_HARDER,true); zxReader=new Z.MultiFormatReader(); zxReader.setHints(hints); }
-  const crops=[[0.9,0.35],[0.7,0.5],[1,1]], cv=zxDecode.cv||(zxDecode.cv=document.createElement('canvas')), cx=cv.getContext('2d',{willReadFrequently:true});
-  const list=round==null?crops:[crops[round%crops.length]];
-  for(const [fw,fh] of list){
-    const cw=Math.round(w*fw), ch=Math.round(h*fh), sc=Math.min(1,1280/cw);
-    cv.width=Math.round(cw*sc); cv.height=Math.round(ch*sc);
-    cx.drawImage(src,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cv.width,cv.height);
-    for(const Bin of [Z.HybridBinarizer,Z.GlobalHistogramBinarizer]){
-      try{ return zxReader.decode(new Z.BinaryBitmap(new Bin(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText(); }catch(e){}
-    }
-  }
-  return null;
+// מפענח ZXing-C++ (WebAssembly): מהיר ומדויק בהרבה בברקודים של מוצרים. נטען רק כשפותחים את הסורק.
+let wasmP=null;
+function loadWasm(){
+  return wasmP||(wasmP=new Promise((ok,no)=>{ const sc=document.createElement('script'); sc.src='zxing-wasm.js';
+    sc.onload=()=>{ try{ ZXingWASM.prepareZXingModule({overrides:{locateFile:(p,pre)=>p.endsWith('.wasm')?'zxing_reader.wasm':pre+p},fireImmediately:true}).then(()=>ok(ZXingWASM),no); }catch(e){no(e);} };
+    sc.onerror=no; document.head.appendChild(sc); }));
 }
+const RD_OPTS={formats:['EAN13','EAN8','UPCA'],tryHarder:true,tryRotate:true,tryInvert:false,maxNumberOfSymbols:1};
+// חידוד אופקי (unsharp mask) – מציל ברקודים מטושטשים כשהמצלמה לא ממקדת עד הסוף
+function sharpenH(id,r,amt){
+  const d=id.data, W=id.width, H=id.height, g=new Float32Array(W), out=new Uint8ClampedArray(W);
+  for(let y=0;y<H;y++){ const o=y*W*4;
+    for(let x=0;x<W;x++){ const i=o+x*4; g[x]=d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11; }
+    let acc=0; for(let x=-r;x<=r;x++) acc+=g[Math.min(W-1,Math.max(0,x))];
+    for(let x=0;x<W;x++){ const b=acc/(2*r+1); out[x]=g[x]+amt*(g[x]-b);
+      acc+=g[Math.min(W-1,x+r+1)]-g[Math.max(0,x-r)]; }
+    for(let x=0;x<W;x++){ const i=o+x*4, v=out[x]; d[i]=d[i+1]=d[i+2]=v; }
+  }
+  return id;
+}
+// החלקה אנכית (הפסים אנכיים) – מנקה רעש בלי לטשטש את הפסים
+function smoothV(id,r){
+  const d=id.data, W=id.width, H=id.height, src=new Uint8ClampedArray(d);
+  for(let x=0;x<W;x++){ let acc=0,n=0;
+    for(let y=0;y<Math.min(H,r);y++){acc+=src[(y*W+x)*4];n++;}
+    for(let y=0;y<H;y++){ if(y+r<H){acc+=src[((y+r)*W+x)*4];n++;} if(y-r-1>=0){acc-=src[((y-r-1)*W+x)*4];n--;}
+      const i=(y*W+x)*4, v=acc/n; d[i]=d[i+1]=d[i+2]=v; } }
+  return id;
+}
+async function wasmRead(src){ const Z=await loadWasm(); const r=await Z.readBarcodes(src,RD_OPTS); const ok=r.find(x=>x.isValid&&/^\d{8,13}$/.test(x.text)); return ok?ok.text:null; }
+// אישור קריאה: ברקוד שקיים בנתונים – מיד; אחר – רק אם נקרא אותו מספר פעמיים (מונע מספרים שגויים)
+const inData=c=>data&&data.items.some(it=>it[0]===c||it[0]===c.replace(/^0+/,''));
+let lastRead='', lastReadN=0;
+function confirmRead(code){ if(inData(code)) return true; if(code===lastRead){ if(++lastReadN>=2) return true; } else { lastRead=code; lastReadN=1; } return false; }
 async function openScanner(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#scan').hidden=false; $('#scanTxt').textContent='אין גישה למצלמה חיה – אפשר לצלם תמונה או להקליד'; return; }
-  $('#scan').hidden=false; $('#scanTxt').textContent='החזיקו את הטלפון כ־15–20 ס״מ מהברקוד';
-  loadZX().catch(()=>{});
+  lastRead=''; lastReadN=0;
+  $('#scan').hidden=false; $('#scanTxt').textContent='החזיקו את הטלפון כ־15–20 ס״מ מהברקוד, לרוחב';
+  const wp=loadWasm().catch(()=>null);
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#scanTxt').textContent='אין גישה למצלמה חיה – אפשר לצלם תמונה או להקליד'; return; }
   try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false}); }
   catch(e){ scanStream=null; $('#scanTxt').textContent='אין גישה למצלמה – אפשר לצלם תמונה או להקליד את המספר'; return; }
   const v=$('#scanV'); v.srcObject=scanStream; try{await v.play();}catch(e){}
-  // פוקוס רציף + זום קל (כך מחזיקים רחוק יותר והמצלמה מצליחה למקד), אם הטלפון תומך
   const tr=scanStream.getVideoTracks()[0];
   const tune=async()=>{ try{ const c=tr.getCapabilities?tr.getCapabilities():{}; const adv={};
     if(c.focusMode&&c.focusMode.includes('continuous')) adv.focusMode='continuous';
     if(c.zoom) adv.zoom=Math.min(c.zoom.max,Math.max(c.zoom.min,2));
     if(Object.keys(adv).length) await tr.applyConstraints({advanced:[adv]}); }catch(e){} };
-  tune(); v.onclick=tune;   // נגיעה במסך – מנסה למקד שוב
+  tune(); v.onclick=tune;
   scanOn=true;
   let det=null;
-  if('BarcodeDetector' in window){ try{ det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}); }catch(e){} }
-  let round=0;
+  if('BarcodeDetector' in window){ try{ const f=await BarcodeDetector.getSupportedFormats(); if(f.includes('ean_13')) det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a']}); }catch(e){} }
+  const Z=det?null:await wp;
+  if(!det&&!Z){ $('#scanTxt').textContent='לא הצלחתי לטעון את הסורק – אפשר לצלם תמונה או להקליד'; return; }
+  const cv=document.createElement('canvas'), cx=cv.getContext('2d',{willReadFrequently:true}); let round=0;
   const loop=async()=>{ if(!scanOn) return; let code=null;
     try{
       if(det){ const r=await det.detect(v); code=r[0]&&r[0].rawValue; }
-      else if(window.ZXing&&v.videoWidth) code=zxDecode(v,v.videoWidth,v.videoHeight,round++);
+      else if(v.videoWidth){
+        // רצועה במרכז (איפה שהמסגרת), מוקטנת לרוחב 1000 – מהיר ומספיק לברקוד
+        // כל פריים בגרסה אחרת: רגיל / מחודד / מחודד חזק / מוקטן – אחד מהם כמעט תמיד נקרא
+        const mode=round++%4, w=v.videoWidth,h=v.videoHeight, cw=Math.round(w*0.9), ch=Math.round(h*0.45), sc=Math.min(1,(mode===3?600:1000)/cw);
+        cv.width=Math.round(cw*sc); cv.height=Math.round(ch*sc);
+        cx.drawImage(v,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cv.width,cv.height);
+        let id=cx.getImageData(0,0,cv.width,cv.height);
+        if(mode===1) id=sharpenH(id,3,2.5); else if(mode===2) id=smoothV(sharpenH(id,5,4),6);
+        const r=await Z.readBarcodes(id,RD_OPTS);
+        const ok=r.find(x=>x.isValid&&/^\d{8,13}$/.test(x.text)); code=ok&&ok.text;
+      }
     }catch(e){}
-    if(code&&/^\d{6,14}$/.test(code)){ foundCode(code); return; } setTimeout(loop,80); };
+    if(code&&confirmRead(code)){ foundCode(code); return; }
+    requestAnimationFrame(loop); };
   loop();
 }
 // צילום תמונה עם מצלמת הטלפון הרגילה (פוקוס ומאקרו מלאים) ופענוח מהתמונה
 async function scanPhoto(file){
   if(!file) return; $('#scanTxt').textContent='מפענח את התמונה…';
   try{
-    const img=await new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=URL.createObjectURL(file);});
-    let code=null;
-    if('BarcodeDetector' in window){ try{ const r=await new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}).detect(img); code=r[0]&&r[0].rawValue; }catch(e){} }
-    if(!code){ await loadZX(); code=zxDecode(img,img.naturalWidth,img.naturalHeight);
-      if(!code){ // אולי הברקוד אנכי – מסובבים
-        const c=document.createElement('canvas'); c.width=img.naturalHeight; c.height=img.naturalWidth; const x=c.getContext('2d');
-        x.translate(c.width/2,c.height/2); x.rotate(Math.PI/2); x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2);
-        code=zxDecode(c,c.width,c.height); } }
+    let code=await wasmRead(file);
+    if(!code){ const img=await createImageBitmap(file), c=document.createElement('canvas'), sc=Math.min(1,1600/Math.max(img.width,img.height));
+      c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc); const x=c.getContext('2d'); x.drawImage(img,0,0,c.width,c.height);
+      for(const [r,a] of [[3,2.5],[5,4],[2,1.5]]){ code=await wasmRead(sharpenH(x.getImageData(0,0,c.width,c.height),r,a)); if(code) break; } }
     if(code){ foundCode(code); return; }
   }catch(e){}
   $('#scanTxt').textContent='לא זוהה ברקוד בתמונה. נסו שוב מקרוב יותר, עם תאורה טובה, או הקלידו את המספר.';
