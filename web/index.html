@@ -138,8 +138,10 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .scanbtn{flex:none;width:48px;height:46px;font-size:22px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0;cursor:pointer}
 #scan{position:fixed;inset:0;z-index:60;background:#000;display:flex;align-items:center;justify-content:center}#scan[hidden]{display:none}
 #scanV{width:100%;height:100%;object-fit:cover}
-.sframe{position:absolute;left:10%;right:10%;top:calc(50% - 25%);height:50%;max-height:240px;top:calc(50% - 120px);border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
-.stxt{position:absolute;bottom:calc(60px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:16px;text-shadow:0 1px 4px #000}
+.sframe{position:absolute;left:8%;right:8%;height:180px;top:calc(50% - 90px);border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.sbtns{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));left:0;right:0;display:flex;gap:10px;justify-content:center}
+.sbtn{font:inherit;font-size:15px;font-weight:600;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.5);border-radius:999px;padding:10px 16px;cursor:pointer}
+.stxt{position:absolute;bottom:calc(84px + env(safe-area-inset-bottom));padding:0 16px;left:0;right:0;text-align:center;color:#fff;font-size:16px;text-shadow:0 1px 4px #000}
 #scanX{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:20px}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
@@ -241,7 +243,9 @@ h3{font-size:16px;margin:14px 0 8px}
 </nav>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
 <div id="scan" hidden><video id="scanV" playsinline muted autoplay></video><div class="sframe"></div>
-  <div class="stxt" id="scanTxt">כוונו את המצלמה לברקוד של המוצר</div><button id="scanX" aria-label="סגירה">✕</button></div>
+  <div class="stxt" id="scanTxt">כוונו את המצלמה לברקוד של המוצר</div>
+  <div class="sbtns"><label class="sbtn">📸 צילום תמונה<input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label><button class="sbtn" id="scanType">⌨️ הקלדת מספר</button></div>
+  <button id="scanX" aria-label="סגירה">✕</button></div>
 <div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">הבנתי</button><div class="muted" style="text-align:center;margin-top:8px;font-size:12px">ההודעה לא תקפוץ שוב עד שיהיה שינוי. אפשר לראות אותה בכל רגע בכפתור הקטן למעלה.</div></div></div>
 <div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
 <script src="match.js"></script>
@@ -522,33 +526,67 @@ function addProduct(it){
 let scanStream=null, scanOn=false;
 function loadZX(){ return window.ZXing?Promise.resolve():new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='zxing.min.js';sc.onload=ok;sc.onerror=no;document.head.appendChild(sc);}); }
 function stopScan(){ scanOn=false; if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;} $('#scan').hidden=true; }
-async function openScanner(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){notify('הדפדפן לא מאפשר גישה למצלמה');return;}
-  $('#scan').hidden=false; $('#scanTxt').textContent='כוונו את המצלמה לברקוד של המוצר';
-  try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},audio:false}); }
-  catch(e){ stopScan(); notify('אין גישה למצלמה. אפשר לאשר גישה בהגדרות הדפדפן ולנסות שוב.'); return; }
-  const v=$('#scanV'); v.srcObject=scanStream; try{await v.play();}catch(e){}
-  scanOn=true;
-  let detect;
-  if('BarcodeDetector' in window){
-    try{ const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}); detect=async()=>{const r=await det.detect(v);return r[0]&&r[0].rawValue;}; }catch(e){}
-  }
-  if(!detect){
-    try{ await loadZX(); }catch(e){ stopScan(); notify('לא הצלחתי לטעון את סורק הברקודים'); return; }
-    const Z=window.ZXing, hints=new Map();
+// מפענח ברקוד מתוך canvas עם ZXing: כמה חיתוכים ושני סוגי עיבוד – מגדיל מאוד את סיכויי הזיהוי
+let zxReader=null;
+function zxDecode(src,w,h,round){
+  const Z=window.ZXing; if(!zxReader){ const hints=new Map();
     hints.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128]);
-    hints.set(Z.DecodeHintType.TRY_HARDER,true);
-    const rd=new Z.MultiFormatReader(); rd.setHints(hints);
-    const cv=document.createElement('canvas'), cx=cv.getContext('2d',{willReadFrequently:true});
-    detect=async()=>{ const w=v.videoWidth,h=v.videoHeight; if(!w) return null;
-      const cw=Math.round(w*0.8), ch=Math.round(h*0.5); cv.width=cw; cv.height=ch;   // רק המרכז – מהיר יותר
-      cx.drawImage(v,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cw,ch);
-      try{ return rd.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText(); }catch(e){ return null; } };
+    hints.set(Z.DecodeHintType.TRY_HARDER,true); zxReader=new Z.MultiFormatReader(); zxReader.setHints(hints); }
+  const crops=[[0.9,0.35],[0.7,0.5],[1,1]], cv=zxDecode.cv||(zxDecode.cv=document.createElement('canvas')), cx=cv.getContext('2d',{willReadFrequently:true});
+  const list=round==null?crops:[crops[round%crops.length]];
+  for(const [fw,fh] of list){
+    const cw=Math.round(w*fw), ch=Math.round(h*fh), sc=Math.min(1,1280/cw);
+    cv.width=Math.round(cw*sc); cv.height=Math.round(ch*sc);
+    cx.drawImage(src,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cv.width,cv.height);
+    for(const Bin of [Z.HybridBinarizer,Z.GlobalHistogramBinarizer]){
+      try{ return zxReader.decode(new Z.BinaryBitmap(new Bin(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText(); }catch(e){}
+    }
   }
-  const loop=async()=>{ if(!scanOn) return; let code=null; try{ code=await detect(); }catch(e){}
-    if(code&&/^\d{6,14}$/.test(code)){ foundCode(code); return; } setTimeout(loop,120); };
+  return null;
+}
+async function openScanner(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#scan').hidden=false; $('#scanTxt').textContent='אין גישה למצלמה חיה – אפשר לצלם תמונה או להקליד'; return; }
+  $('#scan').hidden=false; $('#scanTxt').textContent='החזיקו את הטלפון כ־15–20 ס״מ מהברקוד';
+  loadZX().catch(()=>{});
+  try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false}); }
+  catch(e){ scanStream=null; $('#scanTxt').textContent='אין גישה למצלמה – אפשר לצלם תמונה או להקליד את המספר'; return; }
+  const v=$('#scanV'); v.srcObject=scanStream; try{await v.play();}catch(e){}
+  // פוקוס רציף + זום קל (כך מחזיקים רחוק יותר והמצלמה מצליחה למקד), אם הטלפון תומך
+  const tr=scanStream.getVideoTracks()[0];
+  const tune=async()=>{ try{ const c=tr.getCapabilities?tr.getCapabilities():{}; const adv={};
+    if(c.focusMode&&c.focusMode.includes('continuous')) adv.focusMode='continuous';
+    if(c.zoom) adv.zoom=Math.min(c.zoom.max,Math.max(c.zoom.min,2));
+    if(Object.keys(adv).length) await tr.applyConstraints({advanced:[adv]}); }catch(e){} };
+  tune(); v.onclick=tune;   // נגיעה במסך – מנסה למקד שוב
+  scanOn=true;
+  let det=null;
+  if('BarcodeDetector' in window){ try{ det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}); }catch(e){} }
+  let round=0;
+  const loop=async()=>{ if(!scanOn) return; let code=null;
+    try{
+      if(det){ const r=await det.detect(v); code=r[0]&&r[0].rawValue; }
+      else if(window.ZXing&&v.videoWidth) code=zxDecode(v,v.videoWidth,v.videoHeight,round++);
+    }catch(e){}
+    if(code&&/^\d{6,14}$/.test(code)){ foundCode(code); return; } setTimeout(loop,80); };
   loop();
 }
+// צילום תמונה עם מצלמת הטלפון הרגילה (פוקוס ומאקרו מלאים) ופענוח מהתמונה
+async function scanPhoto(file){
+  if(!file) return; $('#scanTxt').textContent='מפענח את התמונה…';
+  try{
+    const img=await new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=URL.createObjectURL(file);});
+    let code=null;
+    if('BarcodeDetector' in window){ try{ const r=await new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128']}).detect(img); code=r[0]&&r[0].rawValue; }catch(e){} }
+    if(!code){ await loadZX(); code=zxDecode(img,img.naturalWidth,img.naturalHeight);
+      if(!code){ // אולי הברקוד אנכי – מסובבים
+        const c=document.createElement('canvas'); c.width=img.naturalHeight; c.height=img.naturalWidth; const x=c.getContext('2d');
+        x.translate(c.width/2,c.height/2); x.rotate(Math.PI/2); x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2);
+        code=zxDecode(c,c.width,c.height); } }
+    if(code){ foundCode(code); return; }
+  }catch(e){}
+  $('#scanTxt').textContent='לא זוהה ברקוד בתמונה. נסו שוב מקרוב יותר, עם תאורה טובה, או הקלידו את המספר.';
+}
+function typeCode(){ const c=prompt('הקלידו את המספר שמתחת לברקוד:'); if(c&&/^\d{4,14}$/.test(c.trim())) foundCode(c.trim()); }
 function foundCode(code){
   stopScan(); if(navigator.vibrate) navigator.vibrate(60);
   // בנתונים ברקוד יכול להופיע עם/בלי אפסים מובילים (UPC-A / EAN-13)
@@ -557,6 +595,8 @@ function foundCode(code){
   if(data&&!data.items.some(it=>it[0]===q)) notify(`הברקוד ${esc(code)} לא נמכר בסניפים שבחרת`);
 }
 $('#scanBtn').onclick=openScanner; $('#scanX').onclick=stopScan;
+$('#scanFile').onchange=e=>{const f=e.target.files[0]; e.target.value=''; scanPhoto(f);};
+$('#scanType').onclick=typeCode;
 document.addEventListener('visibilitychange',()=>{ if(document.hidden&&scanOn) stopScan(); });
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----

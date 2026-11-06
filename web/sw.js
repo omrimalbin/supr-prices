@@ -1,6 +1,6 @@
 // שומר עותק של האפליקציה והנתונים האחרונים, כדי שתיפתח גם בלי אינטרנט.
 // תמיד מנסה קודם את הרשת (נתונים טריים), ונופל לעותק השמור רק כשאין חיבור.
-const CACHE = "prices-v33";
+const CACHE = "prices-v34";
 const DATA = "prices-data";   // נשמר בין גרסאות של האפליקציה
 const SHELL = ["./", "index.html", "match.js", "zxing.min.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
