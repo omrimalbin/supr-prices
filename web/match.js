@@ -171,8 +171,15 @@
         }
       }
       for (const op of opts) {
-        const key = grams ? op.cost : normKey(it, op.cost / op.used);   // עם משקל: הזול בסך הכול לכמות
-        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", packs, ...op };
+        // עם משקל: ההשוואה היא על אותה כמות בדיוק בכל סופר –
+        // מחיר לגרם של האריזה × הגרמים שביקשו. מה שקונים בפועל (אריזות שלמות) נשמר בנפרד.
+        let o2 = op;
+        if (packs) {
+          const adj = (op.cost / op.used) * (grams / it[4]) * qty;
+          o2 = { ...op, cost: adj, actual: op.cost, actualG: op.used * it[4], adjusted: Math.abs(op.used * it[4] - grams * qty) > 1 };
+        }
+        const key = grams ? o2.cost : normKey(it, op.cost / op.used);
+        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", packs, ...o2 };
       }
     }
     if (best && pending && pending.key < best.key * 0.98) best.offer = pending;   // מבצע כמות שמשתלם יותר – לשאול
