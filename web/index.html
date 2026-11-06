@@ -120,6 +120,11 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .ctab .cp{font-size:11px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ctab td.best{background:var(--soft)}.ctab td.best b{color:var(--accent)}.ctab td.na{color:var(--muted)}.ctab tfoot td{font-size:14px;border-bottom:0}
 .adj{margin-top:6px;font-size:12.5px;line-height:1.45;background:var(--soft);color:var(--ink);border-radius:8px;padding:6px 8px}.ctab .adjc{color:var(--accent)}
+#areaPop{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+#areaPop[hidden]{display:none}.poplink{font:inherit;font-size:14px;border:0;background:none;color:var(--accent);padding:6px 0 0;cursor:pointer}
+#list .item{touch-action:pan-y;position:relative}#list .item.swiping{background:var(--soft);border-color:var(--accent)}
+#list .item.swiping::after{content:"🛒 הוספה לרשימה";position:absolute;top:8px;left:12px;font-size:12px;font-weight:600;color:var(--accent)}
+#list .item.added{animation:addf .9s}@keyframes addf{0%{background:var(--soft)}100%{background:var(--card)}}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
 .locline{display:block;font-size:12px;color:var(--muted);font-weight:400}
@@ -134,6 +139,11 @@ h3{font-size:16px;margin:14px 0 8px}
 <header>
   <div class="hrow"><h1>מחירי סופר</h1><button class="areabtn" id="areaBtn">📍 <span id="areaName">…</span></button></div>
   <div class="muted" id="meta"></div>
+  <div id="areaPop" hidden>
+    <div class="muted" style="margin-bottom:2px">בחירת עיר (אפשר כמה יחד):</div>
+    <div class="chips cities" id="popCities"></div>
+    <button class="poplink" id="popMore">📍 לפי מיקום · ➕ הוספת עיר ←</button>
+  </div>
   <div id="install"><span id="installText">להתקין כאפליקציה במסך הבית?</span><span><button id="installBtn">התקנה</button><button class="x" id="installX">✕</button></span></div>
 </header>
 
@@ -162,6 +172,7 @@ h3{font-size:16px;margin:14px 0 8px}
 <!-- 🔍 מוצרים -->
 <section class="pane" id="p-prod" hidden>
   <input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…">
+  <div class="muted" id="swipeHint" style="margin:6px 0 2px">💡 החליקו מוצר ימינה או שמאלה כדי להוסיף אותו לרשימת הקניות.</div>
   <div class="chips" id="sorts">
     <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
     <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
@@ -232,17 +243,18 @@ function drawCities(){
   const have=new Set(meta.cities.map(c=>c.name));
   for(const n in pending){const c=meta.cities.find(x=>x.name===n); if(c&&(c.radius||0)>=(pending[n].radius||0)&&!c.error) delete pending[n];}
   LS.set('pending',JSON.stringify(pending));
-  $('#cities').innerHTML=meta.cities.map(c=>`<span class="chip ${selCities.includes(c.slug)?'on':''}" data-slug="${c.slug}">${selCities.includes(c.slug)&&meta.cities.length>1?'✓ ':''}${esc(c.name)}</span>`).join('')
+  const chipsH=meta.cities.map(c=>`<span class="chip ${selCities.includes(c.slug)?'on':''}" data-slug="${c.slug}">${selCities.includes(c.slug)&&meta.cities.length>1?'✓ ':''}${esc(c.name)}</span>`).join('')
     +Object.keys(pending).map(n=>`<span class="chip pendc">⏳ ${esc(n)}${pending[n].radius?` + ${pending[n].radius} ק"מ`:''} – בהכנה</span>`).join('')
-    +(locMode?`<span class="chip on" id="nearChip">📍 עד ${locMode.r} ק"מ ממני</span>`:'');
-  document.querySelectorAll('#cities [data-slug]').forEach(x=>x.onclick=()=>{
+    +(locMode?`<span class="chip on">📍 עד ${locMode.r} ק"מ ממני</span>`:'');
+  $('#cities').innerHTML=chipsH; $('#popCities').innerHTML=chipsH;
+  document.querySelectorAll('.cities [data-slug]').forEach(x=>x.onclick=()=>{
     const sl=x.dataset.slug;
     if(selCities.includes(sl)){ if(selCities.length===1) return; selCities=selCities.filter(v=>v!==sl); }   // לפחות עיר אחת
     else selCities.push(sl);
     LS.set('cities',JSON.stringify(selCities)); drawCities(); loadCity();});
   updArea(); drawRadii();
   // לחיצה על עיר מבטלת את מצב המיקום
-  document.querySelectorAll('#cities [data-slug]').forEach(x=>x.addEventListener('click',()=>{if(locMode){locMode=null;LS.set('loc','');}},{capture:true}));
+  document.querySelectorAll('.cities [data-slug]').forEach(x=>x.addEventListener('click',()=>{if(locMode){locMode=null;LS.set('loc','');}},{capture:true}));
 }
 async function init(){
   meta=await (await fetch('data/cities.json?'+Date.now())).json();
@@ -409,6 +421,29 @@ function draw(){
     const it=vis[+el.dataset.i];const d=document.createElement('div');d.className='det';
     d.innerHTML=it[3].map(e=>`<div><span><b>${esc(stTitle(e[0]))}</b><span class="locline">📍 ${esc(storeLabel(st[e[0]]).loc)}</span>${staleTxt(e[0])?' <span class="sub">'+staleTxt(e[0])+'</span>':''}${e[2]?`<br><span class="promo">🏷️ ${esc(promoTxt(e))}</span>`:''}</span><span>${nis(e[1])}</span></div>`).join('');el.appendChild(d);});
   const m=$('#more');if(m)m.onclick=()=>{shown+=100;draw();};
+  document.querySelectorAll('#list .item').forEach(el=>swipeAdd(el,()=>vis[+el.dataset.i]));
+}
+// ---- החלקה על מוצר מהמלאי מוסיפה אותו לרשימת הקניות (ומקבעת את המוצר הזה) ----
+function swipeAdd(el,getIt){
+  let x0=0,y0=0,dx=0,mode='';
+  el.addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX;y0=t.clientY;dx=0;mode='';el.style.transition='none';},{passive:true});
+  el.addEventListener('touchmove',e=>{const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
+    if(!mode){if(Math.abs(ddx)>10&&Math.abs(ddx)>Math.abs(ddy)*1.3)mode='h';else if(Math.abs(ddy)>10)mode='v';}
+    if(mode!=='h')return; dx=Math.max(-120,Math.min(120,ddx));
+    el.style.transform=`translateX(${dx}px)`; el.classList.toggle('swiping',Math.abs(dx)>=70);},{passive:true});
+  const end=()=>{el.style.transition='transform .2s';el.style.transform='';el.classList.remove('swiping');
+    if(mode==='h'&&Math.abs(dx)>=70){el._swiped=Date.now();addProduct(getIt());el.classList.add('added');setTimeout(()=>el.classList.remove('added'),900);}
+    mode='';dx=0;};
+  el.addEventListener('touchend',end);el.addEventListener('touchcancel',end);
+  el.addEventListener('click',e=>{if(el._swiped&&Date.now()-el._swiped<500){e.stopImmediatePropagation();}},true);
+}
+function addProduct(it){
+  if(!it)return;   // המוצר עצמו מקובע, אז בלי המשקל מהשם (אחרת תיפתח השוואה לפי גרמים)
+  const nm=cleanLine(it[1].replace(/\*?מבצע\*?/g,' ').replace(W_RE,' ').replace(/[\s\-–]+$/,'').replace(/\s+/g,' ').trim())||it[1];
+  const ls=lines(), k=keyOf(nm), j=ls.findIndex(l=>keyOf(l)===k);
+  if(j>=0) ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+1); else ls.push(joinLine(nm,1));
+  picks[k]=it[0]; delete tmpPicks[k]; LS.set('picks',JSON.stringify(picks));
+  setLines(ls); notify(`🛒 נוסף לרשימה: <b>${esc(nm)}</b>${j>=0?' (כמות +1)':''}`);
 }
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----
@@ -472,7 +507,11 @@ function setTab(t){
   window.scrollTo(0,0);
 }
 document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
-$('#areaBtn').onclick=()=>setTab('area');
+// בחירת עיר מהפינה למעלה – חלונית קטנה
+$('#areaBtn').onclick=e=>{e.stopPropagation();$('#areaPop').hidden=!$('#areaPop').hidden;};
+$('#popMore').onclick=()=>{$('#areaPop').hidden=true;setTab('area');};
+$('#areaPop').onclick=e=>e.stopPropagation();
+document.addEventListener('click',()=>{$('#areaPop').hidden=true;});
 function updArea(){
   if(!meta) return;
   const sel=meta.cities.filter(c=>selCities.includes(c.slug)).map(c=>c.name);
