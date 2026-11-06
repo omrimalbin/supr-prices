@@ -122,7 +122,9 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .adj{margin-top:6px;font-size:12.5px;line-height:1.45;background:var(--soft);color:var(--ink);border-radius:8px;padding:6px 8px}.ctab .adjc{color:var(--accent)}
 #areaPop{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
 #areaPop[hidden]{display:none}.poplink{font:inherit;font-size:14px;border:0;background:none;color:var(--accent);padding:6px 0 0;cursor:pointer}
-#list .item{touch-action:pan-y;position:relative}#list .item.swiping{background:var(--soft);border-color:var(--accent)}
+#list{overflow-x:hidden;overflow-x:clip}body{overflow-x:hidden}
+#list .item{touch-action:pan-y;position:relative}
+.inlist{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--accent);border-radius:10px;padding:1px 8px;margin-inline-end:6px;vertical-align:2px}.inlist[hidden]{display:none}.inlist.pop{animation:bpop .4s}@keyframes bpop{50%{transform:scale(1.25)}}#list .item.swiping{background:var(--soft);border-color:var(--accent)}
 #list .item.swiping::after{content:"🛒 הוספה לרשימה";position:absolute;top:8px;left:12px;font-size:12px;font-weight:600;color:var(--accent)}
 #list .item.added{animation:addf .9s}@keyframes addf{0%{background:var(--soft)}100%{background:var(--card)}}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
@@ -410,7 +412,7 @@ function draw(){
   const r=filtered();
   const st=data.stores;
   $('#list').innerHTML=(r.length?'':'<div class="muted">לא נמצאו מוצרים</div>')+r.slice(0,shown).map((it,i)=>`<div class="item" data-i="${i}">
-    <div class="top"><div><div class="name">${esc(it[1]||'(ללא שם)')}</div>
+    <div class="top"><div><div class="name">${inListBadge(it[0])}${esc(it[1]||'(ללא שם)')}</div>
     <div class="sub">${it[2]?esc(it[2])+' · ':''}<span class="bc">${esc(it[0])}</span></div>
     <div class="sub">הכי זול ב<b>${esc(stTitle(it[3][0][0]))}</b>${it.n>1?` · עד ${nis(it.max)} · ${it.n} סניפים`:''}</div><div class="locline">📍 ${esc(storeLabel(st[it[3][0][0]]).loc)}</div></div>
     <div class="price">${nis(it.min)}</div></div>${it[3].some(e=>e[2])?'<div class="promo">🏷️ יש מבצע</div>':''}</div>`).join('')
@@ -432,18 +434,23 @@ function swipeAdd(el,getIt){
     if(mode!=='h')return; dx=Math.max(-120,Math.min(120,ddx));
     el.style.transform=`translateX(${dx}px)`; el.classList.toggle('swiping',Math.abs(dx)>=70);},{passive:true});
   const end=()=>{el.style.transition='transform .2s';el.style.transform='';el.classList.remove('swiping');
-    if(mode==='h'&&Math.abs(dx)>=70){el._swiped=Date.now();addProduct(getIt());el.classList.add('added');setTimeout(()=>el.classList.remove('added'),900);}
+    if(mode==='h'&&Math.abs(dx)>=70){el._swiped=Date.now();const it=getIt();addProduct(it);
+      const bd=el.querySelector('.inlist'),n=inListQty(it[0]); if(bd){bd.textContent=`🛒 ${n} ברשימה`;bd.hidden=!n;bd.classList.remove('pop');void bd.offsetWidth;bd.classList.add('pop');}
+      el.classList.add('added');setTimeout(()=>el.classList.remove('added'),900);}
     mode='';dx=0;};
   el.addEventListener('touchend',end);el.addEventListener('touchcancel',end);
   el.addEventListener('click',e=>{if(el._swiped&&Date.now()-el._swiped<500){e.stopImmediatePropagation();}},true);
 }
+// כמה יחידות מהמוצר הזה כבר ברשימה (שורה שהמוצר מקובע בה)
+function inListQty(code){for(const l of lines()){if(picks[keyOf(l)]===code)return effQty(l);}return 0;}
+function inListBadge(code){const n=inListQty(code);return `<span class="inlist" ${n?'':'hidden'}>🛒 ${n} ברשימה</span>`;}
 function addProduct(it){
   if(!it)return;   // המוצר עצמו מקובע, אז בלי המשקל מהשם (אחרת תיפתח השוואה לפי גרמים)
   const nm=cleanLine(it[1].replace(/\*?מבצע\*?/g,' ').replace(W_RE,' ').replace(/[\s\-–]+$/,'').replace(/\s+/g,' ').trim())||it[1];
   const ls=lines(), k=keyOf(nm), j=ls.findIndex(l=>keyOf(l)===k);
   if(j>=0) ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+1); else ls.push(joinLine(nm,1));
   picks[k]=it[0]; delete tmpPicks[k]; LS.set('picks',JSON.stringify(picks));
-  setLines(ls); notify(`🛒 נוסף לרשימה: <b>${esc(nm)}</b>${j>=0?' (כמות +1)':''}`);
+  setLines(ls); notify(`🛒 נוסף לרשימה: <b>${esc(nm)}</b>${j>=0?` · סה״כ ${effQty(lines()[j])}`:''}`);
 }
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----
