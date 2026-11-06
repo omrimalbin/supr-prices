@@ -98,7 +98,10 @@
     if (top) res = res.filter(it => !(it[4] > 0) || fam(it) === top);
     // גודל שביקשו במפורש
     if (q.size) {
-      const sized = res.filter(it => (it[5] === "kg" && q.unit === "g") || (it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15));
+      // במשקל (גרם): כל המותגים נכנסים – שקילים, וארוזים במשקל עד פי 2.5 מהכמות (כמה אריזות שצריך)
+      const sized = q.unit === "g"
+        ? res.filter(it => it[5] === "kg" || (it[5] === "g" && it[4] > 0 && it[4] <= q.size * 2.5))
+        : res.filter(it => it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15);
       if (sized.length) res = sized;
     } else {
       // מסננים אריזות קטנטנות/ענקיות: נשארים בטווח של הגודל הנפוץ
@@ -135,7 +138,7 @@
   // deals[key] = false – מבצע כמות שהמשתמש דחה (לא להציע שוב). מימוש = הגדלת הכמות בשורה.
   // grams – משקל שביקשו (למוצרים שקילים: המחיר לק"ג מוכפל במשקל). בלי משקל – ק"ג אחד.
   function bestIn(cands, store, qty = 1, deals = {}, grams = 0) {
-    if (cands.target) {   // קודם אריזות בגודל הנפוץ; אם אין בסניף – כל הגדלים
+    if (cands.target && !grams) {   // קודם אריזות בגודל הנפוץ; אם אין בסניף – כל הגדלים
       const t = cands.target;
       const near = cands.filter(it => !(it[4] > 0) || it[5] === "kg" || (it[4] >= t * 0.7 && it[4] <= t * 1.5));
       if (near.length < cands.length) {
@@ -148,21 +151,28 @@
       const e = entryIn(it, store);
       if (!e) continue;
       const price = e[1];
-      const amt = it[5] === "kg" ? Math.round(qty * (grams || 1000)) / 1000 : qty;   // ק"ג בפועל לשקילים
+      // כמות במשקל: שקיל – ק"ג בפועל; ארוז במשקל – מספר האריזות שמכסות את הכמות (עד 15% פחות נחשב מספיק)
+      let packs = 0;
+      if (grams && it[5] !== "kg") {
+        if (it[5] !== "g" || !(it[4] > 0)) continue;
+        packs = Math.max(1, Math.ceil(grams / it[4] - 0.15));
+        if (packs > 12) continue;
+      }
+      const amt = it[5] === "kg" ? Math.round(qty * (grams || 1000)) / 1000 : packs ? qty * packs : qty;
       const opts = [{ cost: amt * price, used: amt, promo: null }];
       for (const o of (e[2] || [])) {
         const [mq, bundle] = o;
         if (mq <= amt + 1e-9) {
           const n = Math.floor(amt / mq + 1e-9);
           opts.push({ cost: n * bundle + (amt - n * mq) * price, used: amt, promo: o });
-        } else if (deals[dealKey(it, o)] !== false) {
+        } else if (!grams && deals[dealKey(it, o)] !== false) {
           const k = normKey(it, bundle / mq);
           if (!pending || k < pending.key) pending = { it, offer: o, key: k, price, mq, bundle, unit: bundle / mq };
         }
       }
       for (const op of opts) {
-        const key = normKey(it, op.cost / op.used);
-        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", ...op };
+        const key = grams ? op.cost : normKey(it, op.cost / op.used);   // עם משקל: הזול בסך הכול לכמות
+        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", packs, ...op };
       }
     }
     if (best && pending && pending.key < best.key * 0.98) best.offer = pending;   // מבצע כמות שמשתלם יותר – לשאול

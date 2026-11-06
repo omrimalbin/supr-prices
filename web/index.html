@@ -110,6 +110,15 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 #toast{position:fixed;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:30;max-width:680px;margin:0 auto;
   display:flex;gap:8px;align-items:flex-start;background:var(--accent);color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:15px;line-height:1.5}
 .wsel{margin-top:6px;font-size:13px;color:var(--muted)}.wsel select{width:auto;font-size:16px;padding:4px 8px;border-radius:8px;margin-inline-start:4px}
+.lw select{width:auto;font-size:14px;padding:3px 6px;border-radius:8px;margin-top:4px;color:var(--muted)}
+.ctog{font:inherit;font-size:13px;margin-top:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:4px 10px}
+.ctog.on{background:var(--soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.ctabw{overflow-x:auto;margin-bottom:6px}.ctab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.ctab th,.ctab td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top;text-align:start}
+.ctab th{font-size:13px;background:var(--bg)}.ctab th .loc{font-weight:400;font-size:11px;color:var(--muted)}
+.ctab th:first-child,.ctab td.cn{width:28%}.ctab td.cn{font-weight:600}
+.ctab .cp{font-size:11px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ctab td.best{background:var(--soft)}.ctab td.best b{color:var(--accent)}.ctab td.na{color:var(--muted)}.ctab tfoot td{font-size:14px;border-bottom:0}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
 .locline{display:block;font-size:12px;color:var(--muted);font-weight:400}
@@ -140,7 +149,7 @@ h3{font-size:16px;margin:14px 0 8px}
 עגבניות 2 (= 2 ק&quot;ג)
 שמן 1 ליטר"></textarea></details>
   <button class="btn" id="bgo">השוואת מחירים ←</button>
-  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. בלשונית "השוואה" אפשר להחליף או לקבע מוצר. מוצרים במשקל (ירקות, פירות, בשר): כתבו כמות, למשל "עגבניות 500 גרם" או "עוף 1.5 קילו", או בחרו משקל בהשוואה.</div>
+  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. בלשונית "השוואה" אפשר להחליף או לקבע מוצר. מוצרים במשקל (ירקות, פירות, בשר): כתבו כמות, למשל "עגבניות 500 גרם" או "גבינה צהובה 400 גרם", או בחרו כמות מהרשימה שליד הפריט. בהשוואה אפשר לסמן עד 3 סניפים לטבלה.</div>
 </section>
 
 <!-- 📊 השוואה -->
@@ -403,6 +412,7 @@ function draw(){
 let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
 // ---- רשימת קניות ----
 let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
+let cmpSel=(()=>{try{return JSON.parse(LS.get('cmpSel','[]'))||[]}catch(e){return []}})();
 const picks=JSON.parse(LS.get('picks','{}'));      // 📌 מוצרים קבועים: שורה -> ברקוד (נשמר לפעם הבאה)
 const tmpPicks={};                                   // החלפה ידנית: שורה -> {סניף: ברקוד} – רק בסניף שבו הוחלף, רק להשוואה הנוכחית
 const pickOf=(k,si)=>((tmpPicks[k]||{})[si])||picks[k];
@@ -490,7 +500,9 @@ function renderItems(){
   $('#bclear').hidden=!ls.length; $('#bdg-list').textContent=ls.length||'';
   $('#bitems').innerHTML=ls.length?ls.map((l,i)=>{const {name}=splitLine(l),ov=qtyOv[keyOf(l)],q=effQty(l);
     const pc=picks[keyOf(l)];
-    return `<div class="bitem"><div class="nm">${esc(name)}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}${pc?`<div class="pinq">📌 ${esc(itemName(pc)||'מוצר קבוע')} <a href="#" data-unpinl="${esc(keyOf(l))}">ביטול</a></div>`:''}</div>
+    const wk=weightKind(l), pq=Match.parseLine(l);
+    const wsl=wk?`<div class="lw"><select data-lw="${i}" aria-label="משקל">${(wk==='kg'?[]:[0]).concat(WEIGHTS).map(g=>`<option value="${g}" ${g===((pq.unit==='g'&&pq.size)||(wk==='kg'?1000:0))?'selected':''}>${g?wTxt(g):'כמות: אריזה'}</option>`).join('')}</select></div>`:'';
+    return `<div class="bitem"><div class="nm">${esc(wk?name.replace(W_RE,' ').replace(/\s+/g,' ').trim()||name:name)}${wsl}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}${pc?`<div class="pinq">📌 ${esc(itemName(pc)||'מוצר קבוע')} <a href="#" data-unpinl="${esc(keyOf(l))}">ביטול</a></div>`:''}</div>
       <div class="step"><button data-dec="${i}" aria-label="פחות">−</button><span>${q}</span><button data-inc="${i}" aria-label="עוד">+</button></div>
       <button class="rm" data-rm="${i}" aria-label="הסרה">✕</button></div>`;}).join('')
     :'<div class="muted">הרשימה ריקה – הוסיפו פריטים למטה.</div>';
@@ -498,6 +510,7 @@ function renderItems(){
   document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{const ls=lines(),i=+b.dataset.dec,{name}=splitLine(ls[i]),q=effQty(ls[i]);
     if(q<=1)return; const k=keyOf(ls[i]); if(qtyOv[k]){delete qtyOv[k];saveDeals();}   // הורדת כמות מתחת למבצע – המבצע מתבטל
     ls[i]=joinLine(name,q-1);setLines(ls);});
+  document.querySelectorAll('select[data-lw]').forEach(sl=>sl.onchange=()=>setWeight(+sl.dataset.lw,+sl.value));
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const ls=lines();ls.splice(+b.dataset.rm,1);setLines(ls);});
   document.querySelectorAll('[data-unpinl]').forEach(a=>a.onclick=e=>{e.preventDefault();delete picks[a.dataset.unpinl];LS.set('picks',JSON.stringify(picks));renderItems();if(compared)runBasket();});
 }
@@ -553,11 +566,20 @@ function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return i
 // ---- מוצרים שקילים: בחירת משקל, המחיר מחושב לפי המשקל ----
 const WEIGHTS=[100,150,200,250,300,400,500,600,700,750,800,1000,1200,1250,1500,1750,2000,2500,3000,4000,5000];
 const wTxt=g=>g<1000?`${g} גרם`:`${+(g/1000).toFixed(2)} ק"ג`;
-function wSel(i,p){const cur=(p.q.unit==='g'&&p.q.size)||1000, ws=WEIGHTS.includes(cur)?WEIGHTS:[...WEIGHTS,cur].sort((a,b)=>a-b);
-  return `<div class="wsel">⚖️ נמכר במשקל – כמה לקנות? <select data-w="${i}">${ws.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${wTxt(g)}${p.q.qty>1?' × '+p.q.qty:''}</option>`).join('')}</select></div>`;}
+function wSel(i,p,weighed){const cur=(p.q.unit==='g'&&p.q.size)||(weighed?1000:0);
+  const ws=(weighed?[]:[0]).concat(WEIGHTS.includes(cur)||!cur?WEIGHTS:[...WEIGHTS,cur].sort((a,b)=>a-b));
+  return `<div class="wsel">⚖️ ${weighed?'נמכר במשקל – ':''}כמה לקנות? <select data-w="${i}">${ws.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${g?wTxt(g):'אריזה אחת'}${p.q.qty>1?' × '+p.q.qty:''}</option>`).join('')}</select>${weighed?'':'<div class="sub">בבחירת משקל מושווים כל המותגים: כמה אריזות צריך והמחיר הכולל</div>'}</div>`;}
 const W_RE=/(\d+(?:[.,]\d+)?)\s*(?:ק"?ג|ק״ג|קילו(?:גרם)?|גרם|גר|ג)(?![א-ת])|(?:^|\s)(?:חצי\s*)?(?:קילו(?:גרם)?|ק"ג|ק״ג)(?![א-ת])/g;
 function setWeight(i,g){const ls=lines(); if(!ls[i])return; const {name,qty}=splitLine(ls[i]);
-  ls[i]=joinLine((name.replace(W_RE,' ').replace(/\s+/g,' ').trim()+' '+wTxt(g)),qty); setLines(ls);}
+  const base=name.replace(W_RE,' ').replace(/\s+/g,' ').trim(); ls[i]=joinLine(g?base+' '+wTxt(g):base,qty); setLines(ls);}
+// האם שורה היא מוצר במשקל: 'kg' – בעיקר שקיל (ירקות, בשר), 'g' – ארוז בגרמים (גבינות, אורז), '' – אחר
+const wkCache=new Map(); let wkData=null;
+function weightKind(l){
+  if(!data) return ''; if(wkData!==data){wkCache.clear();wkData=data;Match.prep(data.items);}
+  const q=Match.parseLine(l); if(wkCache.has(q.text)) return wkCache.get(q.text);
+  const c=Match.candidates(data.items,{...q,size:0,unit:''}); let kg=0,g=0,o=0;
+  for(const it of c){if(it[5]==='kg')kg++;else if(it[5]==='g')g++;else if(it[4]>0)o++;}
+  const k=!c.length||o>kg+g?'':kg>=g?'kg':'g'; wkCache.set(q.text,k); return k;}
 function showResults(cmp,deals){
   $('#bres').innerHTML=cmp; $('#bempty').hidden=!!cmp;
   $('#pres').innerHTML=deals; $('#pempty').hidden=!!deals;
@@ -588,7 +610,7 @@ function runBasket(){
     return `<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}"><div class="top"><div>
       <b>${esc(stTitle(s.si))}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
       <div class="loc">📍 ${esc(storeLabel(data.stores[s.si]).loc)}${data.stores[s.si]._me!=null&&locMode?` · ${data.stores[s.si]._me} ק"מ ממך`:''}</div>
-      <div class="info">${info}</div>${save}</div><div class="tot">${nis(s.total)}</div></div></div>`;}).join('');
+      <div class="info">${info}</div>${save}<button class="ctog ${cmpSel.includes(s.si)?'on':''}" data-ct="${s.si}">${cmpSel.includes(s.si)?'☑ בטבלה':'☐ לטבלת השוואה'}</button></div><div class="tot">${nis(s.total)}</div></div></div>`;}).join('');
   if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
   if(mixedTot<res.stores[0].total-0.5||selStore==='mix')
     h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="info">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · <span class="miss">חסרים ${n-mixedFound}</span>`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
@@ -604,6 +626,18 @@ function runBasket(){
       .forEach(d=>avail.push({p,i,d,si}));});
   window._avail=avail;
   const saved=autoUsed.reduce((a,x)=>a+Math.max(0,x.r.price*x.r.used-x.r.cost),0);
+  // ---- טבלת השוואה: עד 3 סניפים מסומנים, שורה לכל מוצר ----
+  cmpSel=cmpSel.filter(si=>res.stores.some(s=>s.si===si));
+  if(cmpSel.length===1) h+='<div class="muted" style="margin:4px 0 8px">סמנו עוד סניף אחד או שניים כדי לראות טבלת השוואה.</div>';
+  if(cmpSel.length>=2){
+    const cs=cmpSel.map(si=>res.stores.find(s=>s.si===si));
+    h+=`<h3 id="ctabH">טבלת השוואה</h3><div class="ctabw"><table class="ctab"><thead><tr><th>מוצר</th>${cs.map(s=>`<th>${esc(stTitle(s.si))}<div class="loc">${esc(storeLabel(data.stores[s.si]).loc)}</div></th>`).join('')}</tr></thead><tbody>`;
+    h+=res.parsed.map((p,i)=>{const rs=cs.map(s=>s.rows[i]); const ok=rs.filter(Boolean).map(r=>r.cost); const mn=ok.length>1?Math.min(...ok):null;
+      return `<tr><td class="cn">${esc(p.line)}</td>${rs.map(r=>r?`<td class="${mn!=null&&r.cost<=mn+0.005?'best':''}"><b>${nis(r.cost)}</b>${r.promo?' 🏷️':''}<div class="cp">${esc(r.it[1])}</div></td>`:'<td class="na">—<div class="cp">לא נמכר</div></td>').join('')}</tr>`;}).join('');
+    const tots=cs.map(s=>s.total), full=cs.map(s=>s.found===n), mt=Math.min(...tots.filter((t,j)=>full[j]).concat([Infinity]));
+    h+=`</tbody><tfoot><tr><td>סה"כ</td>${cs.map((s,j)=>`<td class="${full[j]&&s.total<=mt+0.005?'best':''}"><b>${nis(s.total)}</b>${full[j]?'':`<div class="cp miss">חסרים ${n-s.found}</div>`}</td>`).join('')}</tr></tfoot></table></div>
+      <button class="morebtn" id="ctClear">ניקוי הסימון</button>`;
+  }
   const rankH=h; h='';
   window._dealCount=realized.length+avail.length;
   h+=`<div class="plist"><div class="muted">בסניף: <b>${esc(title)}</b> · ${realized.length} מומשו בהגדלת כמות · ${autoUsed.length} בסל · ${avail.length} זמינים. החליפו סניף בלשונית "השוואה".</div>`;
@@ -626,7 +660,7 @@ function runBasket(){
       ${esc(o.it[1])} – ${o.mq} ב-${nis(o.bundle)} (${nis(o.unit)} ליחידה במקום ${nis(o.price)})<br>להגדיל את הכמות ל-${o.mq} ולממש את המבצע?
       <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line"><div class="top"><div><div class="q">${esc(p.line)}</div>
-      <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div>${r.weighed?wSel(i,p):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,r.cost/r.used)].filter(Boolean).join(' · '))}</div>${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
+      <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.packs?` <span class="muted">× ${r.used} אריזות</span>`:r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div>${r.weighed?wSel(i,p,true):it[5]==='g'&&it[4]>0?wSel(i,p,false):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,r.cost/r.used)].filter(Boolean).join(' · '))}</div>${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
       ${promoLine}${r.manual?'<div class="lock">↔️ הוחלף ידנית בסניף הזה (בשאר הסניפים – הזול ביותר)</div>':r.fallback?`<div class="lock">ℹ️ המוצר הקבוע "${esc(itemName(picks[k])||'')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:r.pinned?'<div class="lock">📌 מוצר קבוע – מוצג בכל הסניפים, בלי קשר למחיר</div>':''}</div>
       <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
       ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
@@ -635,6 +669,11 @@ function runBasket(){
   showResults(rankH+h,promoH);
   document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();
     setTimeout(()=>{const d=[...document.querySelectorAll('#bres h3')].pop();if(d)d.scrollIntoView({behavior:'smooth',block:'start'});},30);});
+  document.querySelectorAll('[data-ct]').forEach(b=>b.onclick=e=>{e.stopPropagation();const si=+b.dataset.ct,j=cmpSel.indexOf(si);
+    if(j>=0)cmpSel.splice(j,1); else {if(cmpSel.length>=3){notify('אפשר לסמן עד 3 סניפים לטבלה');return;} cmpSel.push(si);}
+    LS.set('cmpSel',JSON.stringify(cmpSel)); runBasket();
+    if(cmpSel.length>=2) setTimeout(()=>{const t=$('#ctabH');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});},30);});
+  const cc=$('#ctClear'); if(cc) cc.onclick=()=>{cmpSel=[];LS.set('cmpSel','[]');runBasket();};
   const mb=$('#moreStores'); if(mb) mb.onclick=()=>{showAllStores=!showAllStores;runBasket();};
   document.querySelectorAll('select[data-w]').forEach(sl=>{sl.onclick=e=>e.stopPropagation();sl.onchange=()=>setWeight(+sl.dataset.w,+sl.value);});
   document.querySelectorAll('.swap[data-i]').forEach(b=>b.onclick=()=>openPicker(+b.dataset.i));
