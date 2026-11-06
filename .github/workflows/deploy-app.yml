@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
     paths: ["web/**"]
+  # אחרי כל עדכון מחירים – מפרסם שוב את קובצי המסך העדכניים מ-main,
+  # כדי שעדכון שהתחיל לפני שינוי עיצוב לא ידרוס אותו בגרסה ישנה
+  workflow_run:
+    workflows: ["עדכון מחירים"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:

@@ -22,6 +22,8 @@
     [/(\d+(?:\.\d+)?)\s*(?:גרם|גר|ג)(?![א-ת])/, "g", 1],
     [/(\d+(?:\.\d+)?)\s*(?:מ"?ל|מיליליטר)/, "ml", 1],
     [/(\d+(?:\.\d+)?)\s*(?:ליטר|ל)(?![א-ת])/, "ml", 1000],
+    [/(?:^|\s)(חצי)\s*(?:ק"?ג|קילו(?:גרם)?)(?![א-ת])/, "g", 500],
+    [/(?:^|\s)(?:1\s*)?(קילו|ק"ג)(?![א-ת])/, "g", 1000],
   ];
 
   let EXCL = null;
@@ -39,7 +41,7 @@
     const raw = t.replace(/[׳'`"״]/g, m => (m === "״" || m === '"') ? '"' : "");
     for (const [re, u, mul] of UNIT_RE) {
       const m = raw.match(re);
-      if (m) { size = parseFloat(m[1]) * mul; unit = u; t = raw.replace(m[0], " "); break; }
+      if (m) { size = (/^\d/.test(m[1]) ? parseFloat(m[1]) : 1) * mul; unit = u; t = raw.replace(m[0], " "); break; }
     }
     let m = t.match(/(?:^|\s)[x×*]\s*(\d+)\s*$/i) || t.match(/\s(\d{1,2})\s*$/) || t.match(/^\s*(\d{1,2})\s+(?=\D)/);
     if (m) { qty = parseInt(m[1], 10) || 1; t = t.replace(m[0], " "); }
@@ -96,7 +98,7 @@
     if (top) res = res.filter(it => !(it[4] > 0) || fam(it) === top);
     // גודל שביקשו במפורש
     if (q.size) {
-      const sized = res.filter(it => it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15);
+      const sized = res.filter(it => (it[5] === "kg" && q.unit === "g") || (it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15));
       if (sized.length) res = sized;
     } else {
       // מסננים אריזות קטנטנות/ענקיות: נשארים בטווח של הגודל הנפוץ
@@ -131,12 +133,13 @@
 
   // המוצר הכי משתלם בסניף לכמות qty, כולל מבצעים.
   // deals[key] = false – מבצע כמות שהמשתמש דחה (לא להציע שוב). מימוש = הגדלת הכמות בשורה.
-  function bestIn(cands, store, qty = 1, deals = {}) {
+  // grams – משקל שביקשו (למוצרים שקילים: המחיר לק"ג מוכפל במשקל). בלי משקל – ק"ג אחד.
+  function bestIn(cands, store, qty = 1, deals = {}, grams = 0) {
     if (cands.target) {   // קודם אריזות בגודל הנפוץ; אם אין בסניף – כל הגדלים
       const t = cands.target;
       const near = cands.filter(it => !(it[4] > 0) || it[5] === "kg" || (it[4] >= t * 0.7 && it[4] <= t * 1.5));
       if (near.length < cands.length) {
-        const b = bestIn(near, store, qty, deals);
+        const b = bestIn(near, store, qty, deals, grams);
         if (b) return b;
       }
     }
@@ -145,12 +148,13 @@
       const e = entryIn(it, store);
       if (!e) continue;
       const price = e[1];
-      const opts = [{ cost: qty * price, used: qty, promo: null }];
+      const amt = it[5] === "kg" ? Math.round(qty * (grams || 1000)) / 1000 : qty;   // ק"ג בפועל לשקילים
+      const opts = [{ cost: amt * price, used: amt, promo: null }];
       for (const o of (e[2] || [])) {
         const [mq, bundle] = o;
-        if (mq <= qty + 1e-9) {
-          const n = Math.floor(qty / mq + 1e-9);
-          opts.push({ cost: n * bundle + (qty - n * mq) * price, used: qty, promo: o });
+        if (mq <= amt + 1e-9) {
+          const n = Math.floor(amt / mq + 1e-9);
+          opts.push({ cost: n * bundle + (amt - n * mq) * price, used: amt, promo: o });
         } else if (deals[dealKey(it, o)] !== false) {
           const k = normKey(it, bundle / mq);
           if (!pending || k < pending.key) pending = { it, offer: o, key: k, price, mq, bundle, unit: bundle / mq };
@@ -158,7 +162,7 @@
       }
       for (const op of opts) {
         const key = normKey(it, op.cost / op.used);
-        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, ...op };
+        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", ...op };
       }
     }
     if (best && pending && pending.key < best.key * 0.98) best.offer = pending;   // מבצע כמות שמשתלם יותר – לשאול
@@ -175,17 +179,20 @@
       if (l.qty) q.qty = Math.max(q.qty, l.qty);   // כמות שהוגדלה בעקבות מבצע
       return { ...l, q, cands: candidates(data.items, q), pinned: l.pick && byCode.get(l.pick), tmp: l.tmp || {} };
     });
-    const pick = (p, si) => {
+    const pick = (p, si) => bestPick(p, si);
+    const gramsOf = p => (p.q.unit === "g" ? p.q.size : 0);
+    const bestPick = (p, si) => {
+      const bestIn_ = (c, s, q, d) => bestIn(c, s, q, d, gramsOf(p));
       const t = p.tmp[si] && byCode.get(p.tmp[si]);
-      if (t) { const b = bestIn([t], si, p.q.qty, deals); if (b) { b.manual = true; return b; } }
+      if (t) { const b = bestIn_([t], si, p.q.qty, deals); if (b) { b.manual = true; return b; } }
       if (p.pinned) {
-        const b = bestIn([p.pinned], si, p.q.qty, deals);
+        const b = bestIn_([p.pinned], si, p.q.qty, deals);
         if (b) { b.pinned = true; return b; }
-        const f = bestIn(p.cands, si, p.q.qty, deals);   // הקבוע לא נמכר כאן – הזול ביותר בסניף
+        const f = bestIn_(p.cands, si, p.q.qty, deals);   // הקבוע לא נמכר כאן – הזול ביותר בסניף
         if (f) f.fallback = true;
         return f;
       }
-      return bestIn(p.cands, si, p.q.qty, deals);         // ברירת מחדל: הזול ביותר בסניף
+      return bestIn_(p.cands, si, p.q.qty, deals);         // ברירת מחדל: הזול ביותר בסניף
     };
     const stores = data.stores.map((st, si) => {
       let total = 0, found = 0, offers = 0;
