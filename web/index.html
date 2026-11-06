@@ -127,6 +127,11 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .inlist{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--accent);border-radius:10px;padding:1px 8px;margin-inline-end:6px;vertical-align:2px}.inlist[hidden]{display:none}.inlist.pop{animation:bpop .4s}@keyframes bpop{50%{transform:scale(1.25)}}#list .item.swiping{background:var(--soft);border-color:var(--accent)}
 #list .item.swiping::after{content:"🛒 הוספה לרשימה";position:absolute;top:8px;left:12px;font-size:12px;font-weight:600;color:var(--accent)}
 #list .item.added{animation:addf .9s}@keyframes addf{0%{background:var(--soft)}100%{background:var(--card)}}
+#modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+#modal[hidden]{display:none}.mbox{background:var(--card);color:var(--ink);border-radius:18px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:80vh;overflow:auto}
+.mtitle{font-weight:700;font-size:17px;margin-bottom:6px}#mmsg p{margin:8px 0;line-height:1.5;font-size:15px}
+#mok{display:block;width:100%;margin-top:12px;font:inherit;font-size:16px;font-weight:700;padding:11px;border:0;border-radius:12px;background:var(--accent);color:#fff}
+.homets{font-size:12px;margin-top:2px}.homets.old{color:#b45309}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
 .locline{display:block;font-size:12px;color:var(--muted);font-weight:400}
@@ -226,6 +231,7 @@ h3{font-size:16px;margin:14px 0 8px}
   <button data-t="area"><span class="ic">📍</span>אזור</button>
 </nav>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
+<div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">אישור</button></div></div>
 <div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
 <script src="match.js"></script>
 <script>
@@ -265,7 +271,6 @@ async function init(){
   $('#updInfo').textContent=`המחירים מתעדכנים לבד כל 6 שעות. עדכון אחרון: ${ago(meta.updated)}.`;
   setTab(tab);
   updateNotes();
-  checkStatus();
   selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
   if(!selCities.length&&meta.cities.length) selCities=[meta.cities[0].slug];
   drawCities();
@@ -300,6 +305,13 @@ function updateNotes(){    // עיר חדשה + עדכון מחירים מאז �
   if(seenAt&&meta.updated>seenAt+60) notes.push(`🔄 המחירים עודכנו ${ago(meta.updated)}`);
   LS.set('seenUpdate',String(meta.updated)); LS.set('seenCities',JSON.stringify(meta.cities.map(c=>c.name)));
 }
+// רשתות שחסומות מחוץ לישראל – נשאבות מהמחשב בבית
+const HOME=['ויקטורי','יינות ביתן / קרפור','סופר-פארם','חצי חינם','מחסני השוק','נתיב החסד','ח. כהן'];
+const HOME_OLD=24*3600;
+function homeTs(){ if(!data) return 0; let t=0; for(const st of data.stores) if(HOME.includes(st[0])&&st[2]>t) t=st[2]; return t; }
+function showModal(html){ $('#mmsg').innerHTML=html; $('#modal').hidden=false; $('#mok').focus(); }
+$('#mok').onclick=()=>{$('#modal').hidden=true;};
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').hidden=true;};
 // ---- מצב העדכונים ב-GitHub: תקלה, עדכון שרץ עכשיו או שממתין (למשל למחשב בבית) ----
 const WF={'update.yml':'עדכון המחירים','israel.yml':'השאיבה מהמחשב בבית','deploy-app.yml':'פרסום האפליקציה'};
 async function checkStatus(){
@@ -314,7 +326,7 @@ async function checkStatus(){
       if(act&&f!=='deploy-app.yml'){   // פרסום האפליקציה קצר – רק תקלות שלו מעניינות
         const waitMin=(Date.now()/1000-t(act))/60;
         if(act.status==='in_progress') { out.push(`🔄 ${WF[f]} רץ עכשיו (התחיל ${ago(t(act))}). המחירים יתעדכנו כשיסתיים.`); info.push(`🔄 ${WF[f]} רץ עכשיו`); }
-        else if(f==='israel.yml'&&waitMin>30) { out.push(`⏳ ${WF[f]} ממתינה ${ago(t(act)).replace('לפני ','כבר ')} – כנראה המחשב כבוי. כשיידלק, ויקטורי, קרפור וסופר-פארם יתעדכנו.`); info.push(`⏳ ${WF[f]} ממתינה למחשב`); }
+        else if(f==='israel.yml'&&waitMin>30) { out.push(`⏳ ${WF[f]} ממתינה ${ago(t(act)).replace('לפני ','כבר ')} – כנראה המחשב כבוי. כשיידלק, ויקטורי, קרפור וסופר-פארם יתעדכנו${homeTs()?` (עדכון אחרון שלהן: ${ago(homeTs())})`:''}.`); info.push(`⏳ ${WF[f]} ממתינה למחשב`); }
         else if(f!=='israel.yml') { out.push(`⏳ ${WF[f]} בתור, יתחיל בקרוב.`); info.push(`⏳ ${WF[f]} בתור`); }
       }
       if(last&&last.conclusion==='failure'&&!(act&&act.status==='in_progress')){
@@ -325,15 +337,15 @@ async function checkStatus(){
   }));
   // נתונים ישנים מדי (העדכון האוטומטי אמור לרוץ כל 6 שעות)
   if(meta.updated&&Date.now()/1000-meta.updated>14*3600) out.push(`🕰️ המחירים לא התעדכנו כבר ${ago(meta.updated).replace('לפני ','')}.`);
-  const ui=$('#updInfo'); if(ui&&info.length) ui.innerHTML=esc(ui.textContent)+'<br>'+info.map(esc).join('<br>');
+  const ht=homeTs();
+  if(ht&&Date.now()/1000-ht>HOME_OLD&&!out.some(x=>x.startsWith('⏳ השאיבה'))) out.push(`🏠 ויקטורי, קרפור וסופר-פארם עודכנו לאחרונה ${ago(ht)}. כדי לעדכן אותם צריך להדליק את המחשב בבית.`);
+  const ui=$('#updInfo'); if(ui){ const hl=ht?`🏠 ויקטורי, קרפור וסופר-פארם (מהמחשב בבית): עודכנו ${ago(ht)}`:''; ui.innerHTML=esc(ui.textContent)+[hl,...info].filter(Boolean).map(x=>'<br>'+esc(x)).join(''); }
   if(!out.length) return;
-  const show=()=>notify(out.join('<br>'),()=>setTab('area'),15000);
-  if(!$('#toast').hidden) setTimeout(show,6000); else show();
+  showModal(out.map(x=>`<p>${x}</p>`).join(''));
 }
 function storeNotes(list){ // סניפים חדשים בעיר מאז הביקור הקודם
   for(const {c,d} of list){
     const names=d.stores.map(s=>s[0]+' – '+s[1]), key='seenStores:'+c.slug, seen=JSON.parse(LS.get(key,'null')||'null');
-    const HOME=['ויקטורי','יינות ביתן / קרפור','סופר-פארם','חצי חינם','מחסני השוק','נתיב החסד','ח. כהן'];
     const base=seen||names.filter(n=>!HOME.includes(n.split(' – ')[0]));   // פעם ראשונה: הסניפים מהמחשב בבית נחשבים חדשים
     { const nw=names.filter(n=>!base.includes(n));
       if(nw.length){ const chains=[...new Set(nw.map(n=>n.split(' – ')[0]))];
@@ -429,6 +441,8 @@ async function loadCity(){
   if(ok.length===1) data=await applyLocation(data,ok[0].c.name);
   else data=keepStores(data,st=>!(st[3]>0));
   $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${ok.length>1?` ב-${ok.length} ערים`:''} · עודכן ${ago(meta.updated)}`;
+  { const ht=homeTs(); $('#meta').insertAdjacentHTML('beforeend',`<div class="homets ${ht&&Date.now()/1000-ht>HOME_OLD?'old':''}">🏠 רשתות מהמחשב בבית (ויקטורי, קרפור, סופר-פארם): ${ht?'עודכנו '+ago(ht):'עוד לא נשאבו'}</div>`); }
+  checkStatus();
   shown=60;draw(); if(errHtml) $('#list').insertAdjacentHTML('afterbegin',errHtml);
   lastRes=null;selStore=null;renderItems();updArea();if(lines().length&&(compared||tab==='compare'||tab==='deals'))runBasket();
 }
