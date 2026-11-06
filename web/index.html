@@ -675,7 +675,9 @@ function runBasket(){
   const autoUsed=res.parsed.map((p,i)=>({p,r:rows[i]})).filter(x=>x.r&&x.r.promo);
   const avail=[];
   res.parsed.forEach((p,i)=>{const r=rows[i]; const si=selStore==='mix'?(r&&r.si):selStore; if(si==null)return;
-    Match.dealsFor(p.cands,si).filter(d=>d.mq>p.q.qty+1e-9&&!(r&&r.promo&&Match.dealKey(r.it,r.promo)===d.key)).slice(0,3)
+    // מוצר מקובע – מבצעים רק עליו, לא על מוצרים דומים
+    const pc=picks[keyOf(p.line)], pit=pc&&(itemName(pc),data._byCode.get(pc));
+    Match.dealsFor(pc?(pit?[pit]:[]):p.cands,si).filter(d=>d.mq>p.q.qty+1e-9&&!(r&&r.promo&&Match.dealKey(r.it,r.promo)===d.key)).slice(0,3)
       .forEach(d=>avail.push({p,i,d,si}));});
   window._avail=avail;
   const saved=autoUsed.reduce((a,x)=>a+Math.max(0,regOf(x.r)-x.r.cost),0);

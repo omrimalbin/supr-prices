@@ -206,7 +206,7 @@
         const b = bestIn_([p.pinned], si, p.q.qty, deals);
         if (b) { b.pinned = true; return b; }
         const f = bestIn_(p.cands, si, p.q.qty, deals);   // הקבוע לא נמכר כאן – הזול ביותר בסניף
-        if (f) f.fallback = true;
+        if (f) { f.fallback = true; delete f.offer; }   // בלי הצעות מבצע על מוצר דומה
         return f;
       }
       return bestIn_(p.cands, si, p.q.qty, deals);         // ברירת מחדל: הזול ביותר בסניף
