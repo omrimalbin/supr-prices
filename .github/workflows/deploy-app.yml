@@ -52,3 +52,8 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # לפעמים הפרסום של GitHub נתקע ונכשל אחרי 10 דקות – מנסים שוב אוטומטית
+      - name: retry deploy
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
