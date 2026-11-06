@@ -21,7 +21,21 @@ h1{font-size:21px;margin:0 0 8px}
 select,input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:100%}
 select{width:auto;flex:1}
 .muted{color:var(--muted);font-size:13px}
-main{padding:10px 12px 90px;max-width:700px;margin:0 auto}
+main,.pane{padding:10px 12px calc(84px + env(safe-area-inset-bottom));max-width:700px;margin:0 auto}
+.pane h2{font-size:18px;margin:6px 0 10px}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}.hrow h1{margin:0}
+.areabtn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:20px;padding:6px 12px;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabbar{position:fixed;bottom:0;left:0;right:0;z-index:15;display:flex;background:var(--card);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.tabbar button{flex:1;font:inherit;font-size:12px;border:0;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0;position:relative}
+.tabbar button .ic{font-size:21px;filter:grayscale(1);opacity:.75}
+.tabbar button.on{color:var(--accent);font-weight:700}.tabbar button.on .ic{filter:none;opacity:1}
+.bdg{position:absolute;top:0;left:calc(50% - 22px);background:var(--accent);color:#fff;border-radius:10px;font-size:11px;padding:0 6px;min-width:18px;line-height:18px}
+.bdg:empty{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-top:12px}
+.card h3{margin:2px 0 8px;font-size:16px}
+.btnlink{display:block;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:12px;padding:10px;font-weight:600;margin-top:8px}
+.empty{text-align:center;color:var(--muted);padding:40px 10px;line-height:1.7}
+#pres .plist{border:0;padding:0;background:none;margin:0}
 .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px}
 .top{display:flex;justify-content:space-between;gap:10px}
 .name{font-weight:600}.price{font-weight:700;color:var(--accent);font-size:18px;white-space:nowrap}
@@ -36,12 +50,11 @@ main{padding:10px 12px 90px;max-width:700px;margin:0 auto}
 .more{display:block;width:100%;padding:12px;font:inherit;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
 .err{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--err)}
 a{color:var(--accent)}
-.fab{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.fab_unused{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 #install{display:none;background:var(--soft);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:14px;align-items:center;gap:10px;justify-content:space-between}
 #install button{font:inherit;font-weight:600;border:0;background:var(--accent);color:#fff;border-radius:10px;padding:8px 14px}
 #install .x{background:none;color:var(--muted);padding:4px 8px}
 [hidden]{display:none!important}
-body.basket header{position:static}
 .tabs{display:flex;gap:6px;margin-bottom:10px}
 .tab{flex:1;text-align:center;padding:9px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600;font-size:15px;cursor:pointer}
 .tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -94,7 +107,7 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .pinq{font-size:12px;color:var(--accent)}.pinq a{color:var(--muted)}
 .pinbox{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:10px;background:var(--soft);border-radius:10px;padding:8px 10px}
 .pinbox input{width:auto;margin-top:3px}
-#toast{position:fixed;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));z-index:30;max-width:680px;margin:0 auto;
+#toast{position:fixed;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:30;max-width:680px;margin:0 auto;
   display:flex;gap:8px;align-items:flex-start;background:var(--accent);color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:15px;line-height:1.5}
 #toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
 @media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
@@ -108,30 +121,14 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 h3{font-size:16px;margin:14px 0 8px}
 </style></head><body>
 <header>
-  <h1>מחירי סופר</h1>
-  <div class="tabs"><span class="tab on" data-t="prod">חיפוש מוצרים</span><span class="tab" data-t="basket">רשימת קניות</span></div>
-  <div class="chips cities" id="cities"></div>
-  <div id="addCity" hidden>
-    <div class="row" style="margin-top:8px"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off">
-      <button class="addbtn" id="newCityBtn">שאיבה</button></div>
-    <datalist id="allCities"></datalist>
-    <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע כאן כשתהיה מוכנה.</div>
-  </div>
-  <div id="nearMe" hidden>
-    <div class="muted" style="margin:8px 0 4px">סניפים במרחק של עד:</div>
-    <div class="chips" id="radii" style="padding-top:0"></div>
-    <div class="muted" id="nearMsg" style="margin-top:6px">המיקום המדויק נשאר בטלפון. ל-GitHub נשלחים רק שם היישוב הקרוב והרדיוס.</div>
-  </div>
-  <div class="prodOnly" style="margin-top:8px"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"></div>
-  <div class="chips prodOnly" id="sorts">
-    <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
-    <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
-  </div>
-  <div class="muted" id="meta" style="margin-top:6px"></div>
+  <div class="hrow"><h1>מחירי סופר</h1><button class="areabtn" id="areaBtn">📍 <span id="areaName">…</span></button></div>
+  <div class="muted" id="meta"></div>
   <div id="install"><span id="installText">להתקין כאפליקציה במסך הבית?</span><span><button id="installBtn">התקנה</button><button class="x" id="installX">✕</button></span></div>
 </header>
-<main id="list"><div class="muted">טוען…</div></main>
-<main id="basket" hidden>
+
+<!-- 🛒 רשימה -->
+<section class="pane" id="p-list" hidden>
+  <h2>רשימת הקניות</h2>
   <div id="bitems"></div>
   <button class="clear" id="bclear" hidden>🗑️ ניקוי כל הרשימה</button>
   <div class="row" style="margin-top:8px"><input id="badd" placeholder="הוספת פריט… (למשל: חלב, אורז פרסי, ביצים)" autocomplete="off" enterkeyhint="done"><button class="addbtn" id="baddBtn">הוספה</button></div>
@@ -141,13 +138,71 @@ h3{font-size:16px;margin:14px 0 8px}
 לחם x2
 עגבניות 2 (= 2 ק&quot;ג)
 שמן 1 ליטר"></textarea></details>
-  <button class="btn" id="bgo">השוואת מחירים</button>
-  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. "החלפה" בוחרת מוצר אחר.</div>
+  <button class="btn" id="bgo">השוואת מחירים ←</button>
+  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. בלשונית "השוואה" אפשר להחליף או לקבע מוצר.</div>
+</section>
+
+<!-- 📊 השוואה -->
+<section class="pane" id="p-compare" hidden>
   <div id="bres"></div>
-</main>
+  <div class="empty" id="bempty">אין עדיין השוואה.<br>הוסיפו פריטים בלשונית <b>רשימה</b> ולחצו "השוואת מחירים".</div>
+</section>
+
+<!-- 🔍 מוצרים -->
+<section class="pane" id="p-prod" hidden>
+  <input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…">
+  <div class="chips" id="sorts">
+    <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
+    <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
+  </div>
+  <div id="list"><div class="muted">טוען…</div></div>
+</section>
+
+<!-- 🏷️ מבצעים -->
+<section class="pane" id="p-deals" hidden>
+  <h2>מבצעים ברשימה שלך</h2>
+  <div id="pres"></div>
+  <div class="empty" id="pempty">המבצעים שרלוונטיים לרשימת הקניות יופיעו כאן אחרי השוואת מחירים.</div>
+</section>
+
+<!-- 📍 אזור -->
+<section class="pane" id="p-area" hidden>
+  <h2>ערים</h2>
+  <div class="muted" style="margin-bottom:4px">לחיצה בוחרת עיר. אפשר לבחור כמה ערים יחד להשוואה.</div>
+  <div class="chips cities" id="cities"></div>
+  <div class="card">
+    <h3>📍 לפי המיקום שלי</h3>
+    <div id="nearMe">
+      <div class="muted" style="margin:0 0 4px">סניפים במרחק של עד:</div>
+      <div class="chips" id="radii" style="padding-top:0;flex-wrap:wrap"></div>
+      <div class="muted" id="nearMsg" style="margin-top:6px">המיקום המדויק נשאר בטלפון. ל-GitHub נשלחים רק שם היישוב הקרוב והרדיוס.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>➕ הוספת עיר</h3>
+    <div id="addCity">
+      <div class="row"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off">
+        <button class="addbtn" id="newCityBtn">שאיבה</button></div>
+      <datalist id="allCities"></datalist>
+      <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע כשתהיה מוכנה.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>🔄 עדכון נתונים</h3>
+    <div class="muted" id="updInfo"></div>
+    <a class="btnlink" id="refresh" target="_blank" rel="noopener">רענון המחירים עכשיו (ב-GitHub)</a>
+  </div>
+</section>
+
+<nav class="tabbar" id="tabbar">
+  <button data-t="list"><span class="ic">🛒</span>רשימה<span class="bdg" id="bdg-list"></span></button>
+  <button data-t="compare"><span class="ic">📊</span>השוואה</button>
+  <button data-t="prod"><span class="ic">🔍</span>מוצרים</button>
+  <button data-t="deals"><span class="ic">🏷️</span>מבצעים<span class="bdg" id="bdg-deals"></span></button>
+  <button data-t="area"><span class="ic">📍</span>אזור</button>
+</nav>
 <div id="picker"><div class="sheet" id="psheet"></div></div>
 <div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
-<a class="fab" id="refresh" target="_blank" rel="noopener">רענון עכשיו / הוספת עיר</a>
 <script src="match.js"></script>
 <script>
 const $=s=>document.querySelector(s);
@@ -168,15 +223,13 @@ function drawCities(){
   LS.set('pending',JSON.stringify(pending));
   $('#cities').innerHTML=meta.cities.map(c=>`<span class="chip ${selCities.includes(c.slug)?'on':''}" data-slug="${c.slug}">${selCities.includes(c.slug)&&meta.cities.length>1?'✓ ':''}${esc(c.name)}</span>`).join('')
     +Object.keys(pending).map(n=>`<span class="chip pendc">⏳ ${esc(n)}${pending[n].radius?` + ${pending[n].radius} ק"מ`:''} – בהכנה</span>`).join('')
-    +`<span class="chip ${locMode?'on':'more'}" id="nearChip">📍 ${locMode?`עד ${locMode.r} ק"מ ממני`:'לפי המיקום שלי'}</span>`
-    +(meta.repo?'<span class="chip more" id="addChip">➕ עיר אחרת</span>':'');
+    +(locMode?`<span class="chip on" id="nearChip">📍 עד ${locMode.r} ק"מ ממני</span>`:'');
   document.querySelectorAll('#cities [data-slug]').forEach(x=>x.onclick=()=>{
     const sl=x.dataset.slug;
     if(selCities.includes(sl)){ if(selCities.length===1) return; selCities=selCities.filter(v=>v!==sl); }   // לפחות עיר אחת
     else selCities.push(sl);
     LS.set('cities',JSON.stringify(selCities)); drawCities(); loadCity();});
-  const ac=$('#addChip'); if(ac) ac.onclick=()=>{$('#addCity').hidden=!$('#addCity').hidden; $('#nearMe').hidden=true; if(!$('#addCity').hidden)$('#newCity').focus();};
-  $('#nearChip').onclick=()=>{$('#nearMe').hidden=!$('#nearMe').hidden; $('#addCity').hidden=true; drawRadii();};
+  updArea(); drawRadii();
   // לחיצה על עיר מבטלת את מצב המיקום
   document.querySelectorAll('#cities [data-slug]').forEach(x=>x.addEventListener('click',()=>{if(locMode){locMode=null;LS.set('loc','');}},{capture:true}));
 }
@@ -184,6 +237,7 @@ async function init(){
   meta=await (await fetch('data/cities.json?'+Date.now())).json();
   if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
   else $('#refresh').hidden=true;
+  $('#updInfo').textContent=`המחירים מתעדכנים לבד כל 6 שעות. עדכון אחרון: ${ago(meta.updated)}.`;
   setTab(tab);
   updateNotes();
   selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
@@ -208,6 +262,7 @@ $('#newCity').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();requestCity($
 // ---- הודעה על עדכונים שהסתיימו ----
 function notify(html,onTap){
   $('#tmsg').innerHTML=html; $('#toast').hidden=false;
+  clearTimeout(notify.t); notify.t=setTimeout(()=>$('#toast').hidden=true,8000);
   $('#tmsg').onclick=()=>{$('#toast').hidden=true; if(onTap) onTap();};
 }
 $('#tclose').onclick=()=>$('#toast').hidden=true;
@@ -248,7 +303,7 @@ function drawRadii(){
   $('#radii').innerHTML=[5,10,15,20,25].map(r=>`<span class="chip ${locMode&&locMode.r===r?'on':''}" data-r="${r}">${r} ק"מ</span>`).join('')
     +(locMode?'<span class="chip more" id="locOff">✕ ביטול</span>':'');
   document.querySelectorAll('#radii [data-r]').forEach(x=>x.onclick=()=>useLocation(+x.dataset.r));
-  const off=$('#locOff'); if(off) off.onclick=()=>{locMode=null;LS.set('loc','');$('#nearMe').hidden=true;drawCities();loadCity();};
+  const off=$('#locOff'); if(off) off.onclick=()=>{locMode=null;LS.set('loc','');drawCities();loadCity();};
 }
 function useLocation(r){
   if(!navigator.geolocation){$('#nearMsg').textContent='הטלפון לא מאפשר שימוש במיקום.';return;}
@@ -319,7 +374,7 @@ async function loadCity(){
   else data=keepStores(data,st=>!(st[3]>0));
   $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${ok.length>1?` ב-${ok.length} ערים`:''} · עודכן ${ago(meta.updated)}`;
   shown=60;draw(); if(errHtml) $('#list').insertAdjacentHTML('afterbegin',errHtml);
-  lastRes=null;selStore=null;renderItems();if(tab==='basket'&&$('#blist').value.trim())runBasket();
+  lastRes=null;selStore=null;renderItems();updArea();if(lines().length&&(compared||tab==='compare'||tab==='deals'))runBasket();
 }
 function filtered(){
   const q=$('#q').value.trim().toLowerCase();
@@ -394,13 +449,23 @@ const stTitle=si=>storeLabel(data.stores[si]).title;
 const stFull=si=>{const l=storeLabel(data.stores[si]);return l.title+' · '+l.loc;};
 const staleTxt=si=>{const t=data.stores[si]&&data.stores[si][2];if(!t)return '';const h=(Date.now()/1000-t)/3600;return h<12?'':`⏳ מחירים מלפני ${h<48?Math.round(h)+' שעות':Math.round(h/24)+' ימים'}`;};
 const promoTxt=e=>e&&e[2]?e[2].map(o=>data.promos[o[2]]).join(' · '):'';
-function setTab(t){tab=t;LS.set('tab',t);
-  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.t===t));
-  document.querySelectorAll('.prodOnly').forEach(x=>x.hidden=t!=='prod');
-  document.body.classList.toggle('basket',t==='basket');
-  $('#list').hidden=t!=='prod'; $('#basket').hidden=t!=='basket'; $('#refresh').hidden=t!=='prod'||!meta||!meta.repo;
-  if(t==='basket'&&data&&$('#blist').value.trim()&&!lastRes) runBasket();}
-document.querySelectorAll('.tab').forEach(x=>x.onclick=()=>setTab(x.dataset.t));
+let compared=false;   // האם כבר בוצעה השוואת מחירים לרשימה
+const TABS=['list','compare','prod','deals','area'];
+function setTab(t){
+  if(!TABS.includes(t)) t=t==='basket'?'list':'prod';
+  tab=t; LS.set('tab',t);
+  TABS.forEach(x=>$('#p-'+x).hidden=x!==t);
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  if((t==='compare'||t==='deals')&&data&&lines().length&&!lastRes) runBasket();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
+$('#areaBtn').onclick=()=>setTab('area');
+function updArea(){
+  if(!meta) return;
+  const sel=meta.cities.filter(c=>selCities.includes(c.slug)).map(c=>c.name);
+  $('#areaName').textContent=(sel.join(' + ')||'בחרו עיר')+(locMode?` · ${locMode.r} ק"מ ממני`:'');
+}
 $('#blist').value=LS.get('blist','');
 setTimeout(()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}},0);
 $('#blist').oninput=()=>{LS.set('blist',$('#blist').value);renderItems();};
@@ -416,12 +481,12 @@ function splitLine(l){                      // "לחם x2" -> {name:"לחם", qt
 const joinLine=(name,q)=>q>1?`${name} x${q}`:name;
 function setLines(arr,recompute=true){
   $('#blist').value=arr.join('\n'); LS.set('blist',$('#blist').value); renderItems();
-  if(recompute&&$('#bres').innerHTML.trim()) runBasket();
+  if(recompute&&compared) runBasket();
 }
 function effQty(l){const ov=qtyOv[keyOf(l)];return Math.max(splitLine(l).qty,ov?ov.qty:0);}
 function renderItems(){
   const ls=lines();
-  $('#bclear').hidden=!ls.length;
+  $('#bclear').hidden=!ls.length; $('#bdg-list').textContent=ls.length||'';
   $('#bitems').innerHTML=ls.length?ls.map((l,i)=>{const {name}=splitLine(l),ov=qtyOv[keyOf(l)],q=effQty(l);
     const pc=picks[keyOf(l)];
     return `<div class="bitem"><div class="nm">${esc(name)}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}${pc?`<div class="pinq">📌 ${esc(itemName(pc)||'מוצר קבוע')} <a href="#" data-unpinl="${esc(keyOf(l))}">ביטול</a></div>`:''}</div>
@@ -433,12 +498,12 @@ function renderItems(){
     if(q<=1)return; const k=keyOf(ls[i]); if(qtyOv[k]){delete qtyOv[k];saveDeals();}   // הורדת כמות מתחת למבצע – המבצע מתבטל
     ls[i]=joinLine(name,q-1);setLines(ls);});
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const ls=lines();ls.splice(+b.dataset.rm,1);setLines(ls);});
-  document.querySelectorAll('[data-unpinl]').forEach(a=>a.onclick=e=>{e.preventDefault();delete picks[a.dataset.unpinl];LS.set('picks',JSON.stringify(picks));renderItems();if($('#bres').innerHTML.trim())runBasket();});
+  document.querySelectorAll('[data-unpinl]').forEach(a=>a.onclick=e=>{e.preventDefault();delete picks[a.dataset.unpinl];LS.set('picks',JSON.stringify(picks));renderItems();if(compared)runBasket();});
 }
 $('#bclear').onclick=()=>{
   if(!confirm('למחוק את כל רשימת הקניות?'))return;
   for(const k in qtyOv) delete qtyOv[k]; saveDeals();
-  lastRes=null; selStore=null; $('#bres').innerHTML=''; setLines([],false);
+  lastRes=null; selStore=null; compared=false; showResults('',''); setLines([],false);
 };
 let showAllStores=false;
 function addItem(){
@@ -458,7 +523,7 @@ $('#badd').addEventListener('paste',e=>{     // הדבקת רשימה שלמה �
     if(j>=0) ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty); else ls.push(joinLine(name,qty));}
   setLines(ls);
 });
-$('#bgo').onclick=()=>{selStore=null;runBasket();setTimeout(()=>$('#bres').scrollIntoView({behavior:'smooth'}),50);};
+$('#bgo').onclick=()=>{selStore=null;runBasket();setTab('compare');};
 // ניקוי שורה מרשימה מודבקת: תבליטים, מספור, אמוג'י, "× 1"; כותרות קטגוריה ("ירקות:") נמחקות
 // שמות קטגוריה נפוצים ברשימות קניות – לא מוצרים
 const CATS=new Set(("ירקות|פירות|ירקות ופירות|פירות וירקות|פירות ירקות|ירק|חלבי|חלביים|מוצרי חלב|חלב ומוצריו|חלב וביצים|מקרר|יבשים|מוצרים יבשים|מזווה|"+
@@ -484,9 +549,15 @@ const lines=()=>$('#blist').value.split('\n').map(cleanLine).filter(Boolean);
 const keyOf=l=>Match.parseLine(l).text;
 function sizeTxt(it){return it[5]==='kg'?'לק"ג':it[4]>0?(it[5]==='u'?it[4]+' יח\'':it[4]>=1000?(it[4]/1000)+(it[5]==='ml'?' ל\'':' ק"ג'):it[4]+(it[5]==='ml'?' מ"ל':' גרם')):'';}
 function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return it[5]==='u'?`${nis(u)} ליח'`:it[5]==='ml'?`${nis(u)} לליטר`:`${nis(u)} לק"ג`;}
+function showResults(cmp,deals){
+  $('#bres').innerHTML=cmp; $('#bempty').hidden=!!cmp;
+  $('#pres').innerHTML=deals; $('#pempty').hidden=!!deals;
+  $('#bdg-deals').textContent=deals&&window._dealCount?window._dealCount:'';
+}
 function runBasket(){
-  if(!data){$('#bres').innerHTML='<div class="muted">אין נתונים לעיר הזו</div>';return;}
-  const ls=lines(); if(!ls.length){$('#bres').innerHTML='';return;}
+  if(!data){showResults('<div class="muted">אין נתונים לעיר הזו</div>','');return;}
+  const ls=lines(); if(!ls.length){compared=false;showResults('','');return;}
+  compared=true;
   const live=new Set(ls.map(keyOf)); let dirty=false;
   for(const k in qtyOv) if(!live.has(k)){delete qtyOv[k];dirty=true;}   // שורה שנמחקה – המבצע שלה מתבטל
   for(const l of ls){const k=keyOf(l); if(qtyOv[k]&&Match.parseLine(l).qty>=qtyOv[k].qty){delete qtyOv[k];dirty=true;}}  // הכמות שהוקלדה כבר מספיקה
@@ -524,12 +595,15 @@ function runBasket(){
       .forEach(d=>avail.push({p,i,d,si}));});
   window._avail=avail;
   const saved=autoUsed.reduce((a,x)=>a+Math.max(0,x.r.price*x.r.used-x.r.cost),0);
-  h+=`<details class="plist" ${LS.get('popen','')?'open':''}><summary>🏷️ מבצעים ברשימה · ${realized.length} מומשו בהגדלת כמות · ${autoUsed.length} בסל · ${avail.length} זמינים</summary>`;
+  const rankH=h; h='';
+  window._dealCount=realized.length+avail.length;
+  h+=`<div class="plist"><div class="muted">בסניף: <b>${esc(title)}</b> · ${realized.length} מומשו בהגדלת כמות · ${autoUsed.length} בסל · ${avail.length} זמינים. החליפו סניף בלשונית "השוואה".</div>`;
   if(realized.length) h+='<h4>מומשו – הכמות הוגדלה בכל הסניפים</h4>'+realized.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${x.o.orig} ← ${x.o.qty}<div class="sub">${esc(x.o.desc)} · ${esc(x.o.where)}</div></div><button data-cancel="${esc(keyOf(x.p.line))}">ביטול</button></div>`).join('');
   if(autoUsed.length) h+=`<h4>נכללו בסל ב${esc(title)}${saved>0.005?` · חיסכון ${nis(saved)}`:''}</h4>`+autoUsed.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.r.it[1])}<div class="sub">${esc(data.promos[x.r.promo[2]])}</div></div><span class="promo">−${nis(Math.max(0,x.r.price*x.r.used-x.r.cost))}</span></div>`).join('');
   if(avail.length) h+=`<h4>מבצעי כמות זמינים${selStore==='mix'?'':' ב'+esc(title)}</h4>`+avail.map((x,j)=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.d.it[1])}<div class="sub">${esc(data.promos[x.d.offer[2]])} · ${x.d.mq} ב-${nis(x.d.bundle)} (${nis(x.d.unit)} ליח' במקום ${nis(x.d.price)})${selStore==='mix'?' · '+esc(storeName(x.si)):''}</div></div><button class="add" data-add="${j}">הוספה</button></div>`).join('');
   if(!realized.length&&!autoUsed.length&&!avail.length) h+='<div class="sub" style="padding-bottom:8px">אין מבצעים רלוונטיים לרשימה הזו</div>';
-  h+='</details>';
+  h+='</div>';
+  const promoH=h; h='';
   h+=`<h3>הפירוט – ${esc(title)}</h3>`;
   h+=res.parsed.map((p,i)=>{const r=rows[i];const k=keyOf(p.line),pinned=!!picks[k];
     if(!r) return `<div class="line"><div class="q">${esc(p.line)}</div><div class="sub miss">${p.cands.length?'לא נמכר בסניף הזה':'לא נמצא מוצר מתאים – נסו לנסח אחרת'}</div><button class="swap" data-i="${i}">בחירת מוצר</button>${pinned?` <button class="swap" data-unpin="${esc(k)}">📌 ביטול הקיבוע</button>`:''}</div>`;
@@ -549,7 +623,7 @@ function runBasket(){
       ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
         ?`<button class="swap pinon" data-unpin="${esc(k)}">📌 קבוע · ביטול</button>`
         :`<button class="swap" data-pin="${i}">📌 לקבע מוצר זה</button>`}</div></div>`;}).join('');
-  $('#bres').innerHTML=h;
+  showResults(rankH+h,promoH);
   document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();
     setTimeout(()=>{const d=[...document.querySelectorAll('#bres h3')].pop();if(d)d.scrollIntoView({behavior:'smooth',block:'start'});},30);});
   const mb=$('#moreStores'); if(mb) mb.onclick=()=>{showAllStores=!showAllStores;runBasket();};
@@ -561,7 +635,7 @@ function runBasket(){
     const o=r.offer; applyDeal(p,{mq:o.mq,offer:o.offer,key:Match.dealKey(o.it,o.offer),it:o.it},storeName(si));});
   document.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{e.preventDefault();const x=window._avail[+b.dataset.add];applyDeal(x.p,x.d,storeName(x.si));});
   document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cancelDeal(b.dataset.cancel);});
-  const det=document.querySelector('.plist'); if(det) det.ontoggle=()=>LS.set('popen',det.open?'1':'');
+
 }
 function openPicker(i){
   const p=lastRes.parsed[i], key=keyOf(p.line);
