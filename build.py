@@ -91,7 +91,9 @@ def size_info(r):
     if not n and m and unit and unit != "u":
         n = int(m.group(1))
     if n > 1 and size and unit in ("g", "ml"):
-        return size * n, unit, 2
+        # לא מכפילים כאן: לפעמים הגודל בשם הוא של כל המארז ("פילטונה רביעייה 632 גרם").
+        # האפליקציה מחליטה לפי המחיר לק"ג/ליטר של מוצרים דומים.
+        return size, unit, 1
     return size, unit, 1 if size else 0
 
 

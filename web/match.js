@@ -91,9 +91,45 @@
     return false;
   }
 
+  // מארז שהגודל שלו נרשם כגודל של יחידה אחת ("500 מ"ל מארז 12 יח'", "שישייה 1.5 ליטר") – מתקנים לגודל כל המארז,
+  // כדי שהמחיר לליטר/לק"ג יהיה נכון
+  const PACKW = [[/שישי(?:י)?(?:ה|ת)/, 6], [/רביעי(?:י)?(?:ה|ת)/, 4], [/שלישי(?:י)?(?:ה|ת)/, 3], [/תריסר/, 12]];
+  function packCount(nm) {
+    if (/\d\s*[*xX×]\s*\d/.test(nm) || /\d\s*-\s*\d+\s*(?:יח|ק"?ג)/.test(nm)) return [0, false];   // "6*750" כבר חושב; "9-10 יח'" / "12-17 ק"ג" – לא מארז
+    for (const [re, c] of PACKW) if (re.test(nm)) return [c, true];
+    let m = nm.match(/מארז\s*(?:של\s*)?(\d{1,2})(?!\d)/);
+    if (m && +m[1] > 1) return [+m[1], true];
+    m = nm.match(/(\d{1,2})\s*(?:יח'|יחידות|יח)(?![א-ת])/);          // "5 יח' 200 גרם" – לא ברור אם 200 ליחידה או לכולן
+    return m && +m[1] > 1 ? [+m[1], false] : [0, false];
+  }
+  const minPrice = it => Math.min(...it[3].map(e => e[1]));
+  // שני שלבים: מחיר לליטר/ק"ג "רגיל" לכל סוג מוצר (לפי המילה הראשונה), ואז לכל מארז בוחרים –
+  // הגודל בשם הוא של יחידה (מכפילים) או של כל המארז – מה שקרוב יותר למחיר הרגיל של הסוג
+  function packFixAll(items) {
+    const pend = [], per = {};
+    for (const it of items) {
+      if (it._pf || !(it[4] > 0) || (it[5] !== "g" && it[5] !== "ml") || !it[3].length) continue;
+      it._pf = true;
+      const nm = it[1].replace(/[״]/g, '"').replace(/[׳`]/g, "'");
+      const [n, strong] = packCount(nm), up = minPrice(it) / it[4], k = it.words[0] + "|" + it[5];
+      if (n) { const q = parseLine(nm); if (q.size && q.unit === it[5] && Math.abs(q.size - it[4]) < 1) pend.push([it, n, k, strong]); }
+      else (per[k] = per[k] || []).push(up);
+    }
+    for (const [it, n, k, strong] of pend) {
+      const arr = per[k];
+      let mult = strong;
+      if (arr && arr.length >= 3) {
+        const s = arr.slice().sort((a, b) => a - b), med = s[s.length >> 1], up = minPrice(it) / it[4];
+        mult = Math.abs(Math.log(up / n / med)) < Math.abs(Math.log(up / med));
+      }
+      if (mult) it[4] = it[4] * n;
+    }
+  }
   function prep(items) {           // מחשב פעם אחת מילים מנורמלות לכל מוצר
     if (!EXCL) EXCL = EXCLUDE.map(norm);
-    for (const it of items) if (!it.words) it.words = norm(it[1]).split(" ");
+    let fresh = false;
+    for (const it of items) if (!it.words) { it.words = norm(it[1]).split(" "); fresh = true; }
+    if (fresh) packFixAll(items);
     return items;
   }
 
