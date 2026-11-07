@@ -986,7 +986,7 @@ function runBasket(){
       ${esc(o.it[1])} – ${o.mq} ב-${nis(o.bundle)} (${nis(o.unit)} ליחידה במקום ${nis(o.price)})<br>להגדיל את הכמות ל-${o.mq} ולממש את המבצע?
       <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line" data-li="${i}"><div class="top"><div><div class="q">${esc(p.line)}</div>
-      <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.packs?(!r.adjusted&&r.used>1?` <span class="muted">× ${r.used} אריזות</span>`:''):r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div>${r.weighed?wSel(i,p,true):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,(r.actual??r.cost)/r.used)].filter(Boolean).join(' · '))}</div>${it[0][0]!=='~'?`<div class="bcode">ברקוד ${esc(it[0])}</div>`:''}${adjNote(r,p)}${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
+      <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.packs?(!r.adjusted&&r.used>1?` <span class="muted">× ${r.used} אריזות</span>`:''):r.used!==1?` <span class="muted">× ${r.used}</span>`:''}${r.pc>1?` <span class="muted">· 📦 מארז ${r.pc} יח'</span>`:''}</div>${r.weighed?wSel(i,p,true):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,(r.actual??r.cost)/r.used)].filter(Boolean).join(' · '))}</div>${it[0][0]!=='~'?`<div class="bcode">ברקוד ${esc(it[0])}</div>`:''}${adjNote(r,p)}${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
       ${promoLine}${r.alt?`<div class="lock altl">🔄 חלופה: "${esc(splitLine(p.line).name)}" לא נמכר בסניף הזה – מוצג מוצר דומה</div>`:r.manual?'<div class="lock">↔️ הוחלף ידנית בסניף הזה (בשאר הסניפים – הזול ביותר)</div>':r.fallback?`<div class="lock">ℹ️ המוצר הקבוע "${esc(itemName(picks[k])||'')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:r.pinned?'<div class="lock">📌 מוצר קבוע – מוצג בכל הסניפים, בלי קשר למחיר</div>':''}</div>
       <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
       ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
@@ -1022,7 +1022,8 @@ function openPicker(i){
   const p=lastRes.parsed[i], key=keyOf(p.line);
   const si=selStore==='mix'?(lastRes.mixed[i]&&lastRes.mixed[i].si):selStore;   // הסניף שבו מחליפים
   const auto=Match.candidates(data.items,p.q);
-  const exact=auto.length?auto:Match.candidates(data.items,{...p.q,size:0});
+  // בבחירה ידנית – כל הגדלים (גם מארזים ושישיות), לא רק הגודל הנפוץ
+  const exact=auto.length?(auto.wide&&!p.q.size?auto.wide:auto):Match.candidates(data.items,{...p.q,size:0});
   // גם חלופות מתאימות (מותג אחר מאותו סוג – למשל מים אחרים במקום מי עדן)
   const altSet=new Set(), alts=(p.altFn?p.altFn():[]).filter(it=>!exact.includes(it)); alts.forEach(it=>altSet.add(it[0]));
   // ועוד חלופות רחבות: לפי המילה/שתי המילים הראשונות (זיתים ירוקים בית השיטה -> זיתים ירוקים -> זיתים)

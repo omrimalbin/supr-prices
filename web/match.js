@@ -94,6 +94,7 @@
   // מארז שהגודל שלו נרשם כגודל של יחידה אחת ("500 מ"ל מארז 12 יח'", "שישייה 1.5 ליטר") – מתקנים לגודל כל המארז,
   // כדי שהמחיר לליטר/לק"ג יהיה נכון
   const PACKW = [[/שישי(?:י)?(?:ה|ת)/, 6], [/רביעי(?:י)?(?:ה|ת)/, 4], [/שלישי(?:י)?(?:ה|ת)/, 3], [/תריסר/, 12]];
+  const usz = it => it[4] / (it.pc || 1);   // גודל של יחידה אחת (במארז: חלקי מספר היחידות)
   function packCount(nm) {
     if (/\d\s*[*xX×]\s*\d/.test(nm) || /\d\s*-\s*\d+\s*(?:יח|ק"?ג)/.test(nm)) return [0, false];   // "6*750" כבר חושב; "9-10 יח'" / "12-17 ק"ג" – לא מארז
     for (const [re, c] of PACKW) if (re.test(nm)) return [c, true];
@@ -107,6 +108,8 @@
   // הגודל בשם הוא של יחידה (מכפילים) או של כל המארז – מה שקרוב יותר למחיר הרגיל של הסוג
   function packFixAll(items) {
     const pend = [], per = {};
+    // מספר היחידות במארז – לכל מוצר (גם בלי גודל: "מים עין גדי שישייה 2")
+    for (const it of items) if (!it.pc && it[5] !== "u") { const [n, strong] = packCount(it[1].replace(/[״]/g, '"').replace(/[׳`]/g, "'")); if (n > 1 && strong) it.pc = n; }
     for (const it of items) {
       if (it._pf || !(it[4] > 0) || (it[5] !== "g" && it[5] !== "ml") || !it[3].length) continue;
       it._pf = true;
@@ -123,6 +126,12 @@
         mult = Math.abs(Math.log(up / n / med)) < Math.abs(Math.log(up / med));
       }
       if (mult) it[4] = it[4] * n;
+      it.pc = n;                         // כך או כך זה מארז של n יחידות
+    }
+    // "6*750" / "750*6": מספר היחידות = המספר הקטן (עד 24)
+    for (const it of items) if (!it.pc && it[4] > 0) {
+      const mm = it[1].match(/(\d+(?:\.\d+)?)\s*[*xX×]\s*(\d+(?:\.\d+)?)/);
+      if (mm) { const a = +mm[1], b = +mm[2], c = Math.min(a, b); if (Number.isInteger(c) && c >= 2 && c <= 24 && Math.max(a, b) > 24) it.pc = c; }
     }
   }
   // "שם של אוכל" במוצר: מילה שהיא המילה הראשונה בשמות של הרבה מוצרים בקטלוג (זיתים, טונה, חלב, מים...).
@@ -174,6 +183,7 @@
     const toks = q.text.split(" ").filter(t => t && !STOP.has(t));
     if (!toks.length) return [];
     const groups = groupsOf(toks), allT = groups.flat();
+    let wide = null;
     let res = items.filter(it => {
       const ws = it.words;
       if (!matchAll(it, groups)) return false;
@@ -206,18 +216,24 @@
         : res.filter(it => it[5] === q.unit && Math.abs(it[4] - q.size) <= q.size * 0.15);
       if (sized.length) res = sized;
     } else {
+      wide = res.slice();   // כל הגדלים (גם מארזים) – לבחירה ידנית
       // מסננים אריזות קטנטנות/ענקיות: נשארים בטווח של הגודל הנפוץ
-      const sizes = res.filter(it => it[4] > 0 && it[5] !== "kg").map(it => it[4]).sort((a, b) => a - b);
+      const sizes = res.filter(it => it[4] > 0 && it[5] !== "kg").map(usz).sort((a, b) => a - b);
       if (sizes.length >= 4) {
         const med = sizes[Math.floor(sizes.length / 2)];
-        res = res.filter(it => !(it[4] > 0) || it[5] === "kg" || (it[4] >= med * 0.45 && it[4] <= med * 2.6));
+        res = res.filter(it => !(it[4] > 0) || it[5] === "kg" || (usz(it) >= med * 0.45 && usz(it) <= med * 2.6));
       }
     }
     // הגודל הנפוץ (למשל 12 ביצים, 1 ליטר חלב) – כדי שכל הסניפים יושוו על אותה אריזה
     const cnt = {};
-    for (const it of res) if (it[4] > 0 && it[5] !== "kg") cnt[it[4]] = (cnt[it[4]] || 0) + 1;   // כמה מוצרים שונים בכל גודל
+    for (const it of res) if (it[4] > 0 && it[5] !== "kg") cnt[usz(it)] = (cnt[usz(it)] || 0) + 1;   // כמה מוצרים שונים בכל גודל
     const top2 = Object.keys(cnt).sort((a, b) => (cnt[b] - cnt[a]) || (a - b))[0];
     res.target = q.size || (top2 ? +top2 : 0);
+    // שורה כללית במילה אחת ("מים"): כל הגדלים מתאימים – בוחרים לפי המחיר לליטר/לק"ג
+    // שורה כללית במילה אחת של משקה ("מים", "קולה"): כל הגדלים מתאימים (בקבוק קטן או גדול) – לפי המחיר לליטר
+    if (!q.size && toks.length === 1 && top === "ml") { res.allSizes = true; if (wide) { const w2 = wide; res.length = 0; res.push(...w2); } }
+    res.tunit = top;
+    res.wide = wide || res;
     return res;
   }
 
@@ -239,10 +255,13 @@
   // המוצר הכי משתלם בסניף לכמות qty, כולל מבצעים.
   // deals[key] = false – מבצע כמות שהמשתמש דחה (לא להציע שוב). מימוש = הגדלת הכמות בשורה.
   // grams – משקל שביקשו (למוצרים שקילים: המחיר לק"ג מוכפל במשקל). בלי משקל – ק"ג אחד.
+  // grams: מספר = גרמים שביקשו במפורש ("500 גרם"); או אובייקט {v, u} = כמות כוללת שצריך
+  // (למשל מים × 6 -> 9 ליטר): אז כל הגדלים נכנסים – 6 בקבוקים בודדים או שישייה אחת – והזול לאותה כמות נבחר
   function bestIn(cands, store, qty = 1, deals = {}, grams = 0) {
-    if (cands.target && !grams) {   // קודם אריזות בגודל הנפוץ; אם אין בסניף – כל הגדלים
+    const W = grams && typeof grams === "object" ? grams : grams ? { v: grams * qty, u: "g", explicit: true } : null;
+    if (cands.target && !W && !cands.allSizes) {   // קודם אריזות בגודל הנפוץ; אם אין בסניף – כל הגדלים
       const t = cands.target;
-      const near = cands.filter(it => !(it[4] > 0) || it[5] === "kg" || (it[4] >= t * 0.7 && it[4] <= t * 1.5));
+      const near = cands.filter(it => !(it[4] > 0) || it[5] === "kg" || (usz(it) >= t * 0.7 && usz(it) <= t * 1.5));
       if (near.length < cands.length) {
         const b = bestIn(near, store, qty, deals, grams);
         if (b) return b;
@@ -255,19 +274,26 @@
       const price = e[1];
       // כמות במשקל: שקיל – ק"ג בפועל; ארוז במשקל – מספר האריזות שמכסות את הכמות (עד 15% פחות נחשב מספיק)
       let packs = 0;
-      if (grams && it[5] !== "kg") {
-        if (it[5] !== "g" || !(it[4] > 0)) continue;
-        packs = Math.max(1, Math.ceil(grams / it[4] - 0.15));
+      if (W && it[5] !== "kg") {
+        if (it[5] !== W.u || !(it[4] > 0)) continue;
+        if (!W.explicit && it[4] > W.v * 1.5) continue;          // לא אריזה גדולה בהרבה ממה שצריך
+        packs = Math.max(1, Math.ceil(W.v / it[4] - 0.15));
         if (packs > 12) continue;
       }
-      const amt = it[5] === "kg" ? Math.round(qty * (grams || 1000)) / 1000 : packs ? qty * packs : qty;
+      if (W && it[5] === "kg" && W.u !== "g") continue;
+      // מארז של כמה יחידות (שישייה): כמות 6 -> שישייה אחת או 6 בודדים; מארז גדול מהכמות – לא
+      const pc = it.pc || 1;
+      if (cands.allSizes && cands.target && it[4] > 0 && (usz(it) > Math.max(cands.target * 3.2, 2000) || usz(it) < cands.target / 3.2)) continue;
+      let mpacks = 0;
+      if (!W && pc > 1) { if (pc > qty * 1.25) continue; mpacks = Math.ceil(qty / pc - 1e-9); if (mpacks * pc > qty * 1.5) continue; }
+      const amt = it[5] === "kg" ? Math.round(W ? W.v : qty * 1000) / 1000 : packs ? packs : mpacks || qty;
       const opts = [{ cost: amt * price, used: amt, promo: null }];
       for (const o of (e[2] || [])) {
         const [mq, bundle] = o;
         if (mq <= amt + 1e-9) {
           const n = Math.floor(amt / mq + 1e-9);
           opts.push({ cost: n * bundle + (amt - n * mq) * price, used: amt, promo: o });
-        } else if (!grams && deals[dealKey(it, o)] !== false) {
+        } else if (!W && deals[dealKey(it, o)] !== false) {
           const k = normKey(it, bundle / mq);
           if (!pending || k < pending.key) pending = { it, offer: o, key: k, price, mq, bundle, unit: bundle / mq };
         }
@@ -277,11 +303,11 @@
         // מחיר לגרם של האריזה × הגרמים שביקשו. מה שקונים בפועל (אריזות שלמות) נשמר בנפרד.
         let o2 = op;
         if (packs) {
-          const adj = (op.cost / op.used) * (grams / it[4]) * qty;
-          o2 = { ...op, cost: adj, actual: op.cost, actualG: op.used * it[4], adjusted: Math.abs(op.used * it[4] - grams * qty) > 1 };
+          const adj = (op.cost / op.used) * (W.v / it[4]);
+          o2 = { ...op, cost: adj, actual: op.cost, actualG: op.used * it[4], adjusted: Math.abs(op.used * it[4] - W.v) > 1, want: W };
         }
-        const key = grams ? o2.cost : normKey(it, op.cost / op.used);
-        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", packs, ...o2 };
+        const key = W ? o2.cost : normKey(it, op.cost / op.used);
+        if (!best || key < best.key - 1e-9) best = { it, price, unitPrice: unitPrice(it, op.cost / op.used), key, weighed: it[5] === "kg", packs, pc, ...o2 };
       }
     }
     if (best && pending && pending.key < best.key * 0.98) best.offer = pending;   // מבצע כמות שמשתלם יותר – לשאול
@@ -330,13 +356,21 @@
     const pick = (p, si) => {
       const b = bestPick(p, si);
       if (b || p.tmp[si]) return b;
-      const a = bestIn(altCands(p), si, p.q.qty, deals, gramsOf(p));
+      const a = bestIn(altCands(p), si, p.q.qty, deals, gramsOf(p)) || bestIn(altCands(p), si, p.q.qty, deals, 0);
       if (a) { a.alt = true; delete a.offer; }
       return a;
     };
-    const gramsOf = p => (p.q.unit === "g" ? p.q.size : 0);
+    // כמות כוללת: "500 גרם" במפורש, או – לשורה בלי גודל – הגודל הנפוץ × הכמות (מים × 6 = 9 ליטר)
+    const gramsOf = p => {
+      if (p.q.unit === "g" && p.q.size) return p.q.size;
+      // מוצרים שנספרים ביחידות (ביצים): הכמות הנפוצה × הכמות שביקשו – 2 תבניות של 6 = 12 ביצים
+      const c = p.cands;
+      if (!p.q.size && c.tunit === "u" && c.target > 1) return { v: c.target * p.q.qty, u: "u" };
+      return 0;
+    };
     const bestPick = (p, si) => {
-      const bestIn_ = (c, s, q, d) => bestIn(c, s, q, d, gramsOf(p));
+      const W = gramsOf(p);
+      const bestIn_ = (c, s, q, d) => bestIn(c, s, q, d, W);
       const t = p.tmp[si] && byCode.get(p.tmp[si]);
       if (t) { const b = bestIn_([t], si, p.q.qty, deals); if (b) { b.manual = true; return b; } }
       if (p.pinned) {
