@@ -125,6 +125,37 @@
       if (mult) it[4] = it[4] * n;
     }
   }
+  // "שם של אוכל" במוצר: מילה שהיא המילה הראשונה בשמות של הרבה מוצרים בקטלוג (זיתים, טונה, חלב, מים...).
+  // נלמד מהנתונים – כך גם בשם ארוך ("מארז רביעיית נתחי טונה בשמן פילטונה") יודעים שזה טונה.
+  let HEADS = null, HEADS_OF = null, MANU = new Set();
+  function headStats(items) {
+    if (HEADS_OF === items) return HEADS;
+    const cnt = new Map();
+    const lead = ws => { let i = 0; while (i < ws.length - 1 && (LEAD.has(ws[i]) || /^\d/.test(ws[i]))) i++; return ws[i]; };
+    for (const it of items) {
+      const hs = new Set([lead(it.words), ...(it.heads || [])]);
+      for (const h of hs) if (h && h.length >= 2 && !/^\d/.test(h)) { const k = stem(h); cnt.set(k, (cnt.get(k) || 0) + 1); }
+    }
+    MANU = new Set();   // מילים משמות יצרנים (תנובה, מולר, אסם...) – הן לא "שם האוכל"
+    for (const it of items) if (it[2]) for (const w of norm(it[2]).split(" ")) if (w.length >= 2) MANU.add(w);
+    HEADS = cnt; HEADS_OF = items; return cnt;
+  }
+  // המילה הכי "אוכלית" בשם: זו שהכי הרבה מוצרים מתחילים בה (לא מילת אריזה ולא שם יצרן)
+  const PACKAGING = new Set(["נתחי", "מי", "פרוסות", "פרוס", "פרוסה", "קופסת", "בקבוק", "פחית", "מגש", "שקית", "סלסלת", "ארוז", "טרי", "קפוא"]);
+  function foodIndex(toks, items) {
+    const H = headStats(items); let bi = -1, bv = 5;
+    for (let i = 0; i < toks.length; i++) { const t = toks[i];
+      if (LEAD.has(t) || STOP.has(t) || PACKAGING.has(t) || t.length < 2) continue;
+      const v = (H.get(stem(t)) || 0) * (MANU.has(t) ? 0.25 : 1); if (v > bv) { bv = v; bi = i; } }
+    return bi;
+  }
+  // שאילתות חלופה לפי שם האוכל: "שם האוכל + המילה שאחריו", ואז "שם האוכל" לבד
+  function foodQueries(text, items, brand) {
+    const toks = norm(text).split(" ").filter(t => t && !STOP.has(t) && !/^\d/.test(t));
+    const i = foodIndex(toks, items); if (i < 0) return [];
+    const next = toks.slice(i + 1).find(t => !(brand && brand.has(t)) && !MANU.has(t) && !LEAD.has(t) && !PACKAGING.has(t) && t.length >= 2);
+    return [...new Set([next ? toks[i] + " " + next : null, toks[i]].filter(Boolean))];
+  }
   function prep(items) {           // מחשב פעם אחת מילים מנורמלות לכל מוצר
     if (!EXCL) EXCL = EXCLUDE.map(norm);
     let fresh = false;
@@ -286,7 +317,9 @@
         queries.push([h, ...toks.slice(1).filter(t => !brand.has(t))].join(" "), h);
       }
       // שורה ארוכה (3+ מילים, למשל "זיתים ירוקים שלמים בטעם שום"): שתי המילים הראשונות – סוג המוצר ותיאור עיקרי
-      if (toks.length >= 3) queries.push(toks.slice(0, 2).join(" "));
+      // שם האוכל בשורה (או בשם המוצר שנמצא) – למשל "זיתים" מתוך "זיתים ירוקים שלמים בטעם שום בית השיטה"
+      queries.push(...foodQueries(p.q.text, data.items, brand));
+      if (p.cands[0]) queries.push(...foodQueries(p.cands[0][1], data.items, brand));
       for (const qt of queries) {
         for (const it of candidates(data.items, { ...p.q, text: qt })) if (!seen.has(it[0])) { seen.add(it[0]); out.push(it); }
         if (out.length >= 40) break;
@@ -371,6 +404,6 @@
       + (g0 => g0.some(t => wordMatches(it.words[0], t)) ? 1 : 0)(groups[0]);
     return res.sort((a, b) => b._rel - a._rel);
   }
-  const api = { search, norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, dealsFor, compareBasket, prep };
+  const api = { foodQueries, search, norm, parseLine, candidates, bestIn, unitPrice, priceIn, entryIn, dealKey, dealsFor, compareBasket, prep };
   if (typeof module !== "undefined") module.exports = api; else root.Match = api;
 })(this);

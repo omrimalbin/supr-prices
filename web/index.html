@@ -1026,9 +1026,10 @@ function openPicker(i){
   // גם חלופות מתאימות (מותג אחר מאותו סוג – למשל מים אחרים במקום מי עדן)
   const altSet=new Set(), alts=(p.altFn?p.altFn():[]).filter(it=>!exact.includes(it)); alts.forEach(it=>altSet.add(it[0]));
   // ועוד חלופות רחבות: לפי המילה/שתי המילים הראשונות (זיתים ירוקים בית השיטה -> זיתים ירוקים -> זיתים)
-  { const toks=Match.norm(p.q.text).split(' ').filter(Boolean), seen=new Set([...exact,...alts].map(it=>it[0]));
-    for(const k of [Math.min(2,toks.length-1),1]){ if(k<1) continue;
-      for(const it of Match.candidates(data.items,{...p.q,text:toks.slice(0,k).join(' '),size:0,unit:''})) if(!seen.has(it[0])){seen.add(it[0]);altSet.add(it[0]);alts.push(it);} } }
+  { const seen=new Set([...exact,...alts].map(it=>it[0]));
+    // לפי "שם האוכל" שבשורה/בשם המוצר (נלמד מהנתונים) – זיתים, טונה, גבינה...
+    const qs=[...Match.foodQueries(p.q.text,data.items), ...(exact[0]?Match.foodQueries(exact[0][1],data.items):[])];
+    for(const qt of [...new Set(qs)]) for(const it of Match.candidates(data.items,{...p.q,text:qt,size:0,unit:''})) if(!seen.has(it[0])){seen.add(it[0]);altSet.add(it[0]);alts.push(it);} }
   let pool=exact.concat(alts);
   const inStore=si!=null&&pool.some(it=>Match.priceIn(it,si)!=null);
   if(inStore) pool=pool.filter(it=>Match.priceIn(it,si)!=null);                 // רק מוצרים שנמכרים בסניף הזה
