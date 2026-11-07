@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="מחירי סופר">
+<meta name="theme-color" content="#1f6f5c">
+<title>מחירי סופר</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1d1d1b;--muted:#6b6a65;--line:#e3e0d8;--accent:#1f6f5c;--soft:#e3f1ec;--err:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#151513;--card:#1e1e1b;--ink:#ecebe6;--muted:#9b9a93;--line:#33322e;--accent:#5cc3a6;--soft:#1d3a32;--err:#f2b8b5}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.45}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line)}
+h1{font-size:21px;margin:0 0 8px}
+.row{display:flex;gap:8px;align-items:center}
+select,input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);width:100%}
+select{width:auto;flex:1}
+.muted{color:var(--muted);font-size:13px}
+main,.pane{padding:10px 12px calc(84px + env(safe-area-inset-bottom));max-width:700px;margin:0 auto}
+.pane h2{font-size:18px;margin:6px 0 10px}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}.hrow h1{margin:0}
+.areabtn{font:inherit;font-size:14px;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:20px;padding:6px 12px;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabbar{position:fixed;bottom:0;left:0;right:0;z-index:15;display:flex;background:var(--card);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+.tabbar button{flex:1;font:inherit;font-size:12px;border:0;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0;position:relative}
+.tabbar button .ic{font-size:21px;filter:grayscale(1);opacity:.75}
+.tabbar button.on{color:var(--accent);font-weight:700}.tabbar button.on .ic{filter:none;opacity:1}
+.bdg{position:absolute;top:0;left:calc(50% - 22px);background:var(--accent);color:#fff;border-radius:10px;font-size:11px;padding:0 6px;min-width:18px;line-height:18px}
+.bdg:empty{display:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-top:12px}
+.card h3{margin:2px 0 8px;font-size:16px}
+.btnlink{display:block;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:12px;padding:10px;font-weight:600;margin-top:8px}
+.empty{text-align:center;color:var(--muted);padding:40px 10px;line-height:1.7}
+#pres .plist{border:0;padding:0;background:none;margin:0}
+.item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.top{display:flex;justify-content:space-between;gap:10px}
+.name{font-weight:600}.price{font-weight:700;color:var(--accent);font-size:18px;white-space:nowrap}
+.sub{font-size:13px;color:var(--muted);margin-top:2px}
+.bc{font-family:ui-monospace,monospace;unicode-bidi:plaintext}
+.det{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.det div{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
+.det div:first-child{color:var(--accent);font-weight:600}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-top:8px;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 12px;font-size:13px;white-space:nowrap;cursor:pointer}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.more{display:block;width:100%;padding:12px;font:inherit;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.err{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--err)}
+a{color:var(--accent)}
+.fab_unused{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;max-width:668px;margin:0 auto;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:14px;padding:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+#install{display:none;background:var(--soft);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:14px;align-items:center;gap:10px;justify-content:space-between}
+#install button{font:inherit;font-weight:600;border:0;background:var(--accent);color:#fff;border-radius:10px;padding:8px 14px}
+#install .x{background:none;color:var(--muted);padding:4px 8px}
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{flex:1;text-align:center;padding:9px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600;font-size:15px;cursor:pointer}
+.tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+textarea{font:inherit;font-size:16px;width:100%;min-height:150px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);resize:vertical}
+.btn{display:block;width:100%;padding:12px;font:inherit;font-weight:600;border:0;border-radius:12px;background:var(--accent);color:#fff;margin-top:8px}
+.store{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.store.sel{border:2px solid var(--accent)}
+.store .tot{font-size:20px;font-weight:700}
+.badge{display:inline-block;background:var(--accent);color:#fff;border-radius:8px;padding:1px 8px;font-size:12px;margin-inline-start:6px}
+.line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:6px}
+.line .q{font-weight:600}.line .p{font-weight:700;white-space:nowrap}
+.miss{color:var(--err)}
+.swap{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--accent);border-radius:8px;padding:3px 9px;margin-top:6px}
+.lock{font-size:12px;color:var(--accent)}
+.promo{font-size:13px;color:#b25e00;margin-top:2px}
+@media (prefers-color-scheme:dark){.promo{color:#f0b35a}}
+.offer{background:#fff4e0;border:1px solid #f0c27a;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:14px;color:#1d1d1b}
+.offer .row{margin-top:6px}.offer button{font:inherit;font-size:14px;border-radius:8px;padding:6px 12px;border:1px solid #d08b1f;background:#fff}
+.offer button.yes{background:#d08b1f;color:#fff;border-color:#d08b1f}
+.plist{background:var(--card);border:1px solid #f0c27a;border-radius:14px;padding:4px 12px;margin:10px 0}
+.plist summary{cursor:pointer;font-weight:600;padding:8px 0;color:#b25e00}
+@media (prefers-color-scheme:dark){.plist summary{color:#f0b35a}}
+.plist h4{font-size:14px;margin:10px 0 4px;color:var(--muted)}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.prow button{font:inherit;font-size:13px;border-radius:8px;padding:5px 10px;border:1px solid #d08b1f;background:var(--card);color:#b25e00;white-space:nowrap}
+.prow button.add{background:#d08b1f;color:#fff}
+.bitem{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:6px}
+.bitem .nm{flex:1;font-size:16px}
+.bitem .ovq{font-size:12px;color:#b25e00}
+.step{direction:ltr;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.step button{font:inherit;font-size:18px;width:34px;height:32px;border:0;background:var(--bg);color:var(--ink)}
+.step span{min-width:30px;text-align:center;font-weight:600}
+.rm{font:inherit;border:0;background:none;color:var(--muted);font-size:18px;padding:4px 6px}
+.addbtn{font:inherit;font-weight:600;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:10px 16px;white-space:nowrap}
+details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 0}
+.chip.more{border-style:dashed;color:var(--muted)}
+.cities{flex-wrap:wrap;padding-top:0}.cities .chip{font-size:15px;padding:7px 14px}
+.chip.pendc{border-style:dashed;color:#b25e00}
+#addCity{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 10px;margin-top:8px}
+.pend{font-size:13px;color:#b25e00;margin-top:6px}
+.clear{font:inherit;font-size:14px;border:0;background:none;color:var(--err);padding:4px 2px;margin-top:2px}
+.store{padding:10px 14px}
+.store .tot{font-size:19px}
+.store .info{font-size:13px;color:var(--muted);margin-top:2px}
+.store .info .miss{color:var(--err)}
+.store .save{font-size:13px;color:var(--accent);font-weight:600;margin-top:2px}
+.morebtn{display:block;width:100%;font:inherit;font-size:14px;border:1px dashed var(--line);background:none;color:var(--accent);border-radius:12px;padding:9px;margin-bottom:8px}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.swap.pinon{background:var(--soft);border-color:var(--accent)}
+.pinq{font-size:12px;color:var(--accent)}.pinq a{color:var(--muted)}
+.pinbox{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:10px;background:var(--soft);border-radius:10px;padding:8px 10px}
+.pinbox input{width:auto;margin-top:3px}
+#toast{position:fixed;left:10px;right:10px;bottom:calc(74px + env(safe-area-inset-bottom));z-index:30;max-width:680px;margin:0 auto;
+  display:flex;gap:8px;align-items:flex-start;background:var(--accent);color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:15px;line-height:1.5}
+.wsel{margin-top:6px;font-size:13px;color:var(--muted)}.wsel select{width:auto;font-size:16px;padding:4px 8px;border-radius:8px;margin-inline-start:4px}
+.lw select{width:auto;font-size:14px;padding:3px 6px;border-radius:8px;margin-top:4px;color:var(--muted)}
+.ctog{font:inherit;font-size:13px;margin-top:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:4px 10px}
+.ctog.on{background:var(--soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.ctabw{overflow-x:auto;margin-bottom:6px}.ctab{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.ctab th,.ctab td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top;text-align:start}
+.ctab th{font-size:13px;background:var(--bg)}.ctab th .loc{font-weight:400;font-size:11px;color:var(--muted)}
+.ctab th:first-child,.ctab td.cn{width:28%}.ctab td.cn{font-weight:600}
+.ctab .cp{font-size:11px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ctab td.best{background:var(--soft)}.ctab td.best b{color:var(--accent)}.ctab td.na{color:var(--muted)}.ctab tfoot td{font-size:14px;border-bottom:0}
+.adj{margin-top:6px;font-size:12.5px;line-height:1.45;background:var(--soft);color:var(--ink);border-radius:8px;padding:6px 8px}.ctab .adjc{color:var(--accent)}
+#areaPop{margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+#areaPop[hidden]{display:none}.poplink{font:inherit;font-size:14px;border:0;background:none;color:var(--accent);padding:6px 0 0;cursor:pointer}
+#list{overflow-x:hidden;overflow-x:clip}body{overflow-x:hidden}
+#list .item{touch-action:pan-y;position:relative}
+.inlist{display:inline-block;font-size:12px;font-weight:700;color:#fff;background:var(--accent);border-radius:10px;padding:1px 8px;margin-inline-end:6px;vertical-align:2px}.inlist[hidden]{display:none}.inlist.pop{animation:bpop .4s}@keyframes bpop{50%{transform:scale(1.25)}}
+#bitems,#bres{overflow-x:hidden;overflow-x:clip}
+.swq{touch-action:pan-y;position:relative}
+.swq.sw-plus{background:var(--soft)!important;border-color:var(--accent)!important}.swq.sw-minus{background:#fdecec!important;border-color:#d9534f!important}
+.swq.sw-plus::after,.swq.sw-minus::after{position:absolute;top:50%;transform:translateY(-50%);font-size:15px;font-weight:800}
+.swq.sw-plus::after{content:"+1";right:-36px;color:var(--accent)}.swq.sw-minus::after{content:"−1";left:-36px;color:#d9534f}
+.swq.added{animation:addf .9s}.swq.removed{animation:remf .9s}@keyframes addf{0%{background:var(--soft)}}@keyframes remf{0%{background:#fdecec}}
+.missbox{background:#fdf0cf;border:1.5px solid #d9a43a;border-radius:12px;padding:12px;margin:10px 0;font-size:15px;color:#2a2108}
+.missbox .sub{color:#5c4a1c;font-size:13px}.missbox .mrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e8c879}
+.missbox .mrow button{font:inherit;font-size:14px;font-weight:600;border:1.5px solid #b07d16;background:#fff;color:#5a3d00;border-radius:8px;padding:6px 12px;white-space:nowrap}
+.missbox .morebtn{color:#5a3d00;border-color:#b07d16;background:#fff}
+.exbox{background:var(--card);border:1.5px solid var(--err);border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;font-weight:600;color:var(--ink)}
+.exchip{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin:4px 2px;font-weight:400;color:var(--ink)}
+.exchip a{color:var(--accent);font-weight:700;text-decoration:none}
+@media (prefers-color-scheme:dark){.missbox{background:#3a2e12;border-color:#c99a3a;color:#fbeecf}.missbox .sub{color:#e2cf9e}.missbox .mrow{border-top-color:#5c4a1c}
+ .missbox .mrow button,.missbox .morebtn{background:#2a2108;color:#fbd98a;border-color:#c99a3a}}
+.altl{color:#b45309;font-weight:600}@media (prefers-color-scheme:dark){.altl{color:#f0b35a}}
+.cheapnote{background:var(--soft);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin:6px 0 10px;font-size:14.5px;color:var(--ink);cursor:pointer}
+.cheapnote .sub{color:var(--muted);font-size:12.5px;margin-top:3px}.phead{font-weight:700;font-size:14px;margin:12px 2px 4px;color:#b45309}
+.bcode{font-size:11.5px;color:var(--muted);direction:ltr;text-align:right;font-variant-numeric:tabular-nums;margin-top:1px}
+.exq{font-size:13px;font-weight:600;color:var(--err);margin-top:3px}.exq a{color:var(--accent)}
+
+#modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+#modal[hidden]{display:none}.mbox{background:var(--card);color:var(--ink);border-radius:18px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:80vh;overflow:auto}
+.mtitle{font-weight:700;font-size:17px;margin-bottom:6px}#mmsg p{margin:8px 0;line-height:1.5;font-size:15px}
+#mok{display:block;width:100%;margin-top:12px;font:inherit;font-size:16px;font-weight:700;padding:11px;border:0;border-radius:12px;background:var(--accent);color:#fff}
+.stbtn{font-size:17px;border:1px solid var(--line);background:var(--card);border-radius:999px;width:38px;height:38px;margin-inline-start:auto;margin-inline-end:6px;padding:0;cursor:pointer}
+.stbtn.bad{border-color:#e0a03a;background:#fff4e0}.stbtn[hidden]{display:none}
+.homets{font-size:12px;margin-top:2px}.homets.hold{color:#b45309}
+.qrow{display:flex;gap:8px;align-items:center}.qrow input{flex:1}
+.scanbtn{flex:none;width:48px;height:46px;font-size:22px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0;cursor:pointer}
+#scan{position:fixed;inset:0;z-index:60;background:#000;display:flex;align-items:center;justify-content:center}#scan[hidden]{display:none}
+#scanV{width:100%;height:100%;object-fit:cover}
+.sframe{position:absolute;left:8%;right:8%;height:180px;top:calc(50% - 90px);border:3px solid rgba(255,255,255,.9);border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
+.sbtns{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));left:0;right:0;display:flex;gap:10px;justify-content:center}
+.sbtn{font:inherit;font-size:15px;font-weight:600;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.5);border-radius:999px;padding:10px 16px;cursor:pointer}
+.stxt{position:absolute;bottom:calc(84px + env(safe-area-inset-bottom));padding:0 16px;left:0;right:0;text-align:center;color:#fff;font-size:16px;text-shadow:0 1px 4px #000}
+#scanX{position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:20px}
+#toast[hidden]{display:none}#toast .tmsg{flex:1;cursor:pointer}#toast button{border:0;background:none;color:#fff;font-size:18px;padding:0 4px}
+@media (prefers-color-scheme:dark){#toast{color:#0f201b}#toast button{color:#0f201b}}
+.locline{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.det .locline{margin-top:0}
+.store .loc{font-size:13px;color:var(--muted);margin-top:1px}
+.old{text-decoration:line-through;color:var(--muted);font-weight:400;font-size:13px}
+#picker{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:none;align-items:flex-end}
+#picker .sheet{background:var(--bg);width:100%;max-height:80vh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}
+#picker .opt{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:6px;cursor:pointer}
+h3{font-size:16px;margin:14px 0 8px}
+</style></head><body>
+<header>
+  <div class="hrow"><h1>מחירי סופר</h1><button class="stbtn" id="stBtn" hidden aria-label="מצב העדכונים"></button><button class="areabtn" id="areaBtn">📍 <span id="areaName">…</span></button></div>
+  <div class="muted" id="meta"></div>
+  <div id="areaPop" hidden>
+    <div class="muted" style="margin-bottom:2px">בחירת עיר (אפשר כמה יחד):</div>
+    <div class="chips cities" id="popCities"></div>
+    <button class="poplink" id="popMore">📍 לפי מיקום · ➕ הוספת עיר ←</button>
+  </div>
+  <div id="install"><span id="installText">להתקין כאפליקציה במסך הבית?</span><span><button id="installBtn">התקנה</button><button class="x" id="installX">✕</button></span></div>
+</header>
+
+<!-- 🛒 רשימה -->
+<section class="pane" id="p-list" hidden>
+  <h2>רשימת הקניות</h2>
+  <div id="bitems"></div>
+  <button class="clear" id="bclear" hidden>🗑️ ניקוי כל הרשימה</button>
+  <div class="row" style="margin-top:8px"><input id="badd" placeholder="הוספת פריט… (למשל: חלב, אורז פרסי, ביצים)" autocomplete="off" enterkeyhint="done"><button class="addbtn" id="baddBtn">הוספה</button></div>
+  <details class="txt"><summary>עריכה כטקסט / הדבקת רשימה שלמה</summary>
+  <textarea id="blist" placeholder="מוצר בכל שורה, למשל:
+חלב
+לחם x2
+עגבניות 2 (= 2 ק&quot;ג)
+שמן 1 ליטר"></textarea></details>
+  <button class="btn" id="bgo">השוואת מחירים ←</button>
+  <div class="muted" style="margin-top:6px">בכל סניף נבחר המוצר המתאים הזול ביותר. בלשונית "השוואה" אפשר להחליף או לקבע מוצר. מוצרים במשקל (ירקות, פירות, בשר): כתבו כמות, למשל "עגבניות 500 גרם" או "גבינה צהובה 400 גרם", או בחרו כמות מהרשימה שליד הפריט. בהשוואה אפשר לסמן עד 3 סניפים לטבלה.</div>
+</section>
+
+<!-- 📊 השוואה -->
+<section class="pane" id="p-compare" hidden>
+  <div id="bres"></div>
+  <div class="empty" id="bempty">אין עדיין השוואה.<br>הוסיפו פריטים בלשונית <b>רשימה</b> ולחצו "השוואת מחירים".</div>
+</section>
+
+<!-- 🔍 מוצרים -->
+<section class="pane" id="p-prod" hidden>
+  <div class="qrow"><input id="q" type="search" placeholder="חיפוש מוצר או ברקוד…"><button id="scanBtn" class="scanbtn" aria-label="סריקת ברקוד">📷</button></div>
+  <div class="muted" id="swipeHint" style="margin:6px 0 2px">💡 החלקה שמאלה מוסיפה אחד לרשימה, החלקה ימינה מורידה אחד.</div>
+  <div class="chips" id="sorts">
+    <span class="chip on" data-s="name">לפי שם</span><span class="chip" data-s="cheap">הכי זול</span>
+    <span class="chip" data-s="gap">הפרש מחירים גדול</span><span class="chip" data-s="n">הכי נפוץ</span>
+  </div>
+  <div id="list"><div class="muted">טוען…</div></div>
+</section>
+
+<!-- 🏷️ מבצעים -->
+<section class="pane" id="p-deals" hidden>
+  <h2>מבצעים ברשימה שלך</h2>
+  <div id="pres"></div>
+  <div class="empty" id="pempty">המבצעים שרלוונטיים לרשימת הקניות יופיעו כאן אחרי השוואת מחירים.</div>
+</section>
+
+<!-- 📍 אזור -->
+<section class="pane" id="p-area" hidden>
+  <h2>ערים</h2>
+  <div class="muted" style="margin-bottom:4px">לחיצה בוחרת עיר. אפשר לבחור כמה ערים יחד להשוואה.</div>
+  <div class="chips cities" id="cities"></div>
+  <div class="card">
+    <h3>📍 לפי המיקום שלי</h3>
+    <div id="nearMe">
+      <div class="muted" style="margin:0 0 4px">סניפים במרחק של עד:</div>
+      <div class="chips" id="radii" style="padding-top:0;flex-wrap:wrap"></div>
+      <div class="muted" id="nearMsg" style="margin-top:6px">המיקום המדויק נשאר בטלפון. ל-GitHub נשלחים רק שם היישוב הקרוב והרדיוס.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>➕ הוספת עיר</h3>
+    <div id="addCity">
+      <div class="row"><input id="newCity" list="allCities" placeholder="שם העיר, למשל רחובות" autocomplete="off">
+        <button class="addbtn" id="newCityBtn">שאיבה</button></div>
+      <datalist id="allCities"></datalist>
+      <div class="muted" id="addMsg" style="margin-top:6px">השאיבה רצה ברקע ב-GitHub (כ-10–20 דקות). אפשר להמשיך להשתמש באפליקציה בינתיים – העיר תופיע כשתהיה מוכנה.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>🔄 עדכון נתונים</h3>
+    <div class="muted" id="updInfo"></div>
+    <a class="btnlink" id="refresh" target="_blank" rel="noopener">רענון המחירים עכשיו (ב-GitHub)</a>
+  </div>
+</section>
+
+<nav class="tabbar" id="tabbar">
+  <button data-t="list"><span class="ic">🛒</span>רשימה<span class="bdg" id="bdg-list"></span></button>
+  <button data-t="compare"><span class="ic">📊</span>השוואה</button>
+  <button data-t="prod"><span class="ic">🔍</span>מוצרים</button>
+  <button data-t="deals"><span class="ic">🏷️</span>מבצעים<span class="bdg" id="bdg-deals"></span></button>
+  <button data-t="area"><span class="ic">📍</span>אזור</button>
+</nav>
+<div id="picker"><div class="sheet" id="psheet"></div></div>
+<div id="scan" hidden><video id="scanV" playsinline muted autoplay></video><div class="sframe"></div>
+  <div class="stxt" id="scanTxt">כוונו את המצלמה לברקוד של המוצר</div>
+  <div class="sbtns"><label class="sbtn">📸 צילום תמונה<input id="scanFile" type="file" accept="image/*" capture="environment" hidden></label><button class="sbtn" id="scanType">⌨️ הקלדת מספר</button></div>
+  <button id="scanX" aria-label="סגירה">✕</button></div>
+<div id="modal" hidden><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle">מצב העדכונים</div><div id="mmsg"></div><button id="mok">הבנתי</button><div class="muted" style="text-align:center;margin-top:8px;font-size:12px">ההודעה לא תקפוץ שוב עד שיהיה שינוי. אפשר לראות אותה בכל רגע בכפתור הקטן למעלה.</div></div></div>
+<div id="toast" hidden><div class="tmsg" id="tmsg"></div><button id="tclose" aria-label="סגירה">✕</button></div>
+<script src="match.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LS={get(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const nis=v=>'₪'+Number(v).toFixed(2);
+let meta=null,data=null,sort=LS.get('sort','name'),shown=60;
+
+function ago(t){const m=Math.round((Date.now()/1000-t)/60);return m<1?"עכשיו":m<60?`לפני ${m} דקות`:m<1440?`לפני ${Math.round(m/60)} שעות`:`לפני ${Math.round(m/1440)} ימים`;}
+
+const pending=JSON.parse(LS.get('pending','{}'));      // עיר חדשה שבהכנה -> {at}
+const issueUrl=name=>`https://github.com/${meta.repo}/issues/new?title=${encodeURIComponent('עיר: '+name)}&body=${encodeURIComponent('בקשה מהאפליקציה. לחצו "Submit new issue" – השאיבה תתחיל לבד ברקע, וה-issue ייסגר כשהעיר מוכנה.')}`;
+let selCities=JSON.parse(LS.get('cities','null')||'null')||(LS.get('city','')?[LS.get('city','')]:[]);
+const cache={};   // slug -> נתוני העיר
+function drawCities(){
+  const have=new Set(meta.cities.map(c=>c.name));
+  for(const n in pending){const c=meta.cities.find(x=>x.name===n); if(c&&(c.radius||0)>=(pending[n].radius||0)&&!c.error) delete pending[n];}
+  LS.set('pending',JSON.stringify(pending));
+  const chipsH=meta.cities.map(c=>`<span class="chip ${selCities.includes(c.slug)?'on':''}" data-slug="${c.slug}">${selCities.includes(c.slug)&&meta.cities.length>1?'✓ ':''}${esc(c.name)}</span>`).join('')
+    +Object.keys(pending).map(n=>`<span class="chip pendc">⏳ ${esc(n)}${pending[n].radius?` + ${pending[n].radius} ק"מ`:''} – בהכנה</span>`).join('')
+    +(locMode?`<span class="chip on">📍 עד ${locMode.r} ק"מ ממני</span>`:'');
+  $('#cities').innerHTML=chipsH; $('#popCities').innerHTML=chipsH;
+  document.querySelectorAll('.cities [data-slug]').forEach(x=>x.onclick=()=>{
+    const sl=x.dataset.slug;
+    if(selCities.includes(sl)){ if(selCities.length===1) return; selCities=selCities.filter(v=>v!==sl); }   // לפחות עיר אחת
+    else selCities.push(sl);
+    LS.set('cities',JSON.stringify(selCities)); drawCities(); loadCity();});
+  updArea(); drawRadii();
+  // לחיצה על עיר מבטלת את מצב המיקום
+  document.querySelectorAll('.cities [data-slug]').forEach(x=>x.addEventListener('click',()=>{if(locMode){locMode=null;LS.set('loc','');}},{capture:true}));
+}
+async function init(){
+  meta=await (await fetch('data/cities.json?'+Date.now())).json();
+  if(meta.repo) $('#refresh').href=`https://github.com/${meta.repo}/actions/workflows/update.yml`;
+  else $('#refresh').hidden=true;
+  $('#updInfo').textContent=`המחירים מתעדכנים לבד כל 6 שעות. עדכון אחרון: ${ago(meta.updated)}.`;
+  setTab(tab);
+  updateNotes();
+  selCities=selCities.filter(sl=>meta.cities.some(c=>c.slug===sl));
+  if(!selCities.length&&meta.cities.length) selCities=[meta.cities[0].slug];
+  drawCities();
+  $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
+  document.querySelectorAll('#sorts .chip').forEach(ch=>{ch.classList.toggle('on',ch.dataset.s===sort);ch.onclick=()=>{sort=ch.dataset.s;LS.set('sort',sort);document.querySelectorAll('#sorts .chip').forEach(x=>x.classList.toggle('on',x===ch));shown=60;draw();};});
+  await loadCity();
+}
+// ---- עיר חדשה: נשאבת ברקע ב-GitHub ----
+function requestCity(name,r=0){
+  name=name.trim(); if(!name)return;
+  const ex=meta.cities.find(c=>c.name===name);
+  if(ex&&(ex.radius||0)>=r){$('#addMsg').textContent=`"${name}" כבר קיימת ברשימה.`;return;}
+  pending[name]={at:Date.now(),radius:r}; LS.set('pending',JSON.stringify(pending));
+  window.open(issueUrl(name+(r?' | '+r:'')),'_blank');
+  $('#addMsg').innerHTML=`נפתח GitHub – לחצו שם <b>Submit new issue</b>. אחרי זה "${esc(name)}" תישאב ברקע (כ-10–20 דקות), ואפשר להמשיך להשתמש באפליקציה. העיר תופיע כאן לבד.`;
+  $('#newCity').value=''; drawCities();
+}
+$('#newCityBtn').onclick=()=>requestCity($('#newCity').value);
+$('#newCity').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();requestCity($('#newCity').value);}};
+// ---- הודעה על עדכונים שהסתיימו ----
+function notify(html,onTap,ms){
+  $('#tmsg').innerHTML=html; $('#toast').hidden=false;
+  clearTimeout(notify.t); notify.t=setTimeout(()=>$('#toast').hidden=true,ms||8000);
+  $('#tmsg').onclick=()=>{$('#toast').hidden=true; if(onTap) onTap();};
+}
+$('#tclose').onclick=()=>$('#toast').hidden=true;
+const notes=[];            // הודעות שנאספו בפתיחה
+function updateNotes(){    // עיר חדשה + עדכון מחירים מאז הביקור הקודם
+  const seenAt=+LS.get('seenUpdate',0), seenCities=JSON.parse(LS.get('seenCities','null')||'null');
+  if(seenCities){ const nw=meta.cities.filter(c=>!c.error&&!seenCities.includes(c.name)).map(c=>c.name);
+    if(nw.length) notes.push(`🏙️ נוספה ${nw.length>1?'ערים':'עיר'}: <b>${nw.map(esc).join(', ')}</b>`); }
+  if(seenAt&&meta.updated>seenAt+60) notes.push(`🔄 המחירים עודכנו ${ago(meta.updated)}`);
+  LS.set('seenUpdate',String(meta.updated)); LS.set('seenCities',JSON.stringify(meta.cities.map(c=>c.name)));
+}
+// רשתות שחסומות מחוץ לישראל – נשאבות מהמחשב בבית
+const HOME=['ויקטורי','יינות ביתן / קרפור','סופר-פארם','חצי חינם','מחסני השוק','נתיב החסד','ח. כהן'];
+const HOME_OLD=24*3600;
+function homeTs(){ if(!data) return 0; let t=0; for(const st of data.stores) if(HOME.includes(st[0])&&st[2]>t) t=st[2]; return t; }
+function showModal(html){ $('#mmsg').innerHTML=html; $('#modal').hidden=false; $('#mok').focus(); }
+$('#mok').onclick=()=>{$('#modal').hidden=true;};
+$('#modal').onclick=e=>{if(e.target.id==='modal')$('#modal').hidden=true;};
+// ---- מצב העדכונים ב-GitHub: תקלה, עדכון שרץ עכשיו או שממתין (למשל למחשב בבית) ----
+const WF={'update.yml':'עדכון המחירים','israel.yml':'השאיבה מהמחשב בבית','deploy-app.yml':'פרסום האפליקציה'};
+async function checkStatus(){
+  if(!meta||!meta.repo||checkStatus.done) return; checkStatus.done=true;
+  const out=[], info=[];
+  await Promise.all(Object.keys(WF).map(async f=>{
+    try{
+      const r=await fetch(`https://api.github.com/repos/${meta.repo}/actions/workflows/${f}/runs?per_page=6`,{cache:'no-store'});
+      if(!r.ok) return; const runs=(await r.json()).workflow_runs||[];
+      const act=runs.find(x=>x.status!=='completed'), t=x=>new Date(x.created_at).getTime()/1000;
+      const last=runs.find(x=>x.status==='completed'&&!['cancelled','skipped'].includes(x.conclusion));
+      if(act&&f!=='deploy-app.yml'){   // פרסום האפליקציה קצר – רק תקלות שלו מעניינות
+        const waitMin=(Date.now()/1000-t(act))/60;
+        if(act.status==='in_progress') { out.push(`🔄 ${WF[f]} רץ עכשיו (התחיל ${ago(t(act))}). המחירים יתעדכנו כשיסתיים.`); info.push(`🔄 ${WF[f]} רץ עכשיו`); }
+        else if(f==='israel.yml'&&waitMin>30) { out.push(`⏳ ${WF[f]} ממתינה ${ago(t(act)).replace('לפני ','כבר ')} – כנראה המחשב כבוי. כשיידלק, ויקטורי, קרפור וסופר-פארם יתעדכנו${homeTs()?` (עדכון אחרון שלהן: ${ago(homeTs())})`:''}.`); info.push(`⏳ ${WF[f]} ממתינה למחשב`); }
+        else if(f!=='israel.yml') { out.push(`⏳ ${WF[f]} בתור, יתחיל בקרוב.`); info.push(`⏳ ${WF[f]} בתור`); }
+      }
+      if(last&&last.conclusion==='failure'&&!(act&&act.status==='in_progress')){
+        out.push(`⚠️ ${WF[f]} האחרון נכשל (${ago(new Date(last.updated_at).getTime()/1000)}). המחירים שמוצגים הם מהעדכון המוצלח הקודם.`);
+        info.push(`⚠️ ${WF[f]} האחרון נכשל`);
+      }
+    }catch(e){}
+  }));
+  // נתונים ישנים מדי (העדכון האוטומטי אמור לרוץ כל 6 שעות)
+  if(meta.updated&&Date.now()/1000-meta.updated>14*3600) info.push('🕰️ מחירים ישנים');
+  if(meta.updated&&Date.now()/1000-meta.updated>14*3600) out.push(`🕰️ המחירים לא התעדכנו כבר ${ago(meta.updated).replace('לפני ','')}.`);
+  const ht=homeTs();
+  if(ht&&Date.now()/1000-ht>HOME_OLD) info.push('🏠 רשתות מהבית לא עודכנו יום');
+  if(ht&&Date.now()/1000-ht>HOME_OLD&&!out.some(x=>x.startsWith('⏳ השאיבה'))) out.push(`🏠 ויקטורי, קרפור וסופר-פארם עודכנו לאחרונה ${ago(ht)}. כדי לעדכן אותם צריך להדליק את המחשב בבית.`);
+  const ui=$('#updInfo'); if(ui){ const hl=ht?`🏠 ויקטורי, קרפור וסופר-פארם (מהמחשב בבית): עודכנו ${ago(ht)}`:''; ui.innerHTML=esc(ui.textContent)+[hl,...info].filter(Boolean).map(x=>'<br>'+esc(x)).join(''); }
+  // תצוגה ידידותית: כפתור קטן בראש המסך תמיד (כשיש מה לדווח); חלון קופץ רק כשמשהו חדש –
+  // תקלה / המתנה למחשב / נתונים ישנים שעוד לא אישרת. עדכון שרץ עכשיו – רק בכפתור.
+  const bt=$('#stBtn');
+  if(!out.length){ bt.hidden=true; LS.set('ackStatus',''); return; }
+  const bad=info.some(x=>/^⚠️/.test(x)), html=out.map(x=>`<p>${x}</p>`).join('');
+  bt.textContent=bad?'⚠️':info.every(x=>/^🔄/.test(x))?'🔄':'⏳'; bt.classList.toggle('bad',bad); bt.hidden=false;
+  bt.onclick=e=>{e.stopPropagation();showModal(html);};
+  const sig=info.filter(x=>!/^🔄/.test(x)).sort().join('|');
+  if(sig&&sig!==LS.get('ackStatus','')){ showModal(html); $('#mok').onclick=()=>{$('#modal').hidden=true;LS.set('ackStatus',sig);}; }
+}
+function storeNotes(list){ // סניפים חדשים בעיר מאז הביקור הקודם
+  for(const {c,d} of list){
+    const names=d.stores.map(s=>s[0]+' – '+s[1]), key='seenStores:'+c.slug, seen=JSON.parse(LS.get(key,'null')||'null');
+    const base=seen||names.filter(n=>!HOME.includes(n.split(' – ')[0]));   // פעם ראשונה: הסניפים מהמחשב בבית נחשבים חדשים
+    { const nw=names.filter(n=>!base.includes(n));
+      if(nw.length){ const chains=[...new Set(nw.map(n=>n.split(' – ')[0]))];
+        notes.unshift(`🎉 ${nw.length===1?'נוסף סניף חדש':`נוספו ${nw.length} סניפים חדשים`} ב${esc(c.name)}: <b>${chains.map(esc).join(', ')}</b>`);} }
+    LS.set(key,JSON.stringify(names));
+  }
+  if(notes.length){ notify(notes.join('<br>')); notes.length=0; }
+}
+setInterval(async()=>{   // בזמן שהאפליקציה פתוחה: בדיקה אם הסתיים עדכון (כל דקה כשעיר בהכנה, אחרת כל 5 דקות)
+  if(!meta)return;
+  const now=Date.now(); if(!Object.keys(pending).length&&now-(window._lastPoll||0)<300000)return; window._lastPoll=now;
+  try{const m=await (await fetch('data/cities.json?'+now)).json();
+    if(m.updated>meta.updated){meta=m;for(const k in cache)delete cache[k];drawCities();
+      $('#allCities').innerHTML=(meta.all_cities||[]).map(([n,k])=>`<option value="${esc(n)}">${k} סניפים</option>`).join('');
+      updateNotes(); await loadCity();}}catch(e){}
+},60000);
+// ---- לפי המיקום שלי ----
+let locMode=JSON.parse(LS.get('loc','')||'null');     // {lat,lon,r,city}
+let localities=null;
+async function getLocalities(){ if(!localities){try{localities=await (await fetch('data/localities.json?'+Math.floor(meta.updated))).json();}catch(e){localities={};}} return localities; }
+function km(a,b){const R=6371,t=Math.PI/180,dl=(b[0]-a[0])*t,dn=(b[1]-a[1])*t;const h=Math.sin(dl/2)**2+Math.cos(a[0]*t)*Math.cos(b[0]*t)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function drawRadii(){
+  $('#radii').innerHTML=[5,10,15,20,25].map(r=>`<span class="chip ${locMode&&locMode.r===r?'on':''}" data-r="${r}">${r} ק"מ</span>`).join('')
+    +(locMode?'<span class="chip more" id="locOff">✕ ביטול</span>':'');
+  document.querySelectorAll('#radii [data-r]').forEach(x=>x.onclick=()=>useLocation(+x.dataset.r));
+  const off=$('#locOff'); if(off) off.onclick=()=>{locMode=null;LS.set('loc','');drawCities();loadCity();};
+}
+function useLocation(r){
+  if(!navigator.geolocation){$('#nearMsg').textContent='הטלפון לא מאפשר שימוש במיקום.';return;}
+  $('#nearMsg').textContent='מאתר מיקום…';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const me=[pos.coords.latitude,pos.coords.longitude], locs=await getLocalities();
+    let best=null,bd=1e9; for(const [n,xy] of Object.entries(locs)){const d=km(me,xy); if(d<bd){bd=d;best=n;}}
+    if(!best){$('#nearMsg').textContent='לא מצאתי יישוב קרוב.';return;}
+    const c=meta.cities.find(x=>x.name===best&&!x.error);
+    locMode={lat:me[0],lon:me[1],r,city:best}; LS.set('loc',JSON.stringify(locMode));
+    if(c){ selCities=[c.slug]; LS.set('cities',JSON.stringify(selCities)); }
+    if(!c||(c.radius||0)<r){
+      requestCity(best,r);
+      $('#nearMsg').innerHTML=`היישוב הקרוב: <b>${esc(best)}</b>. נפתח GitHub – לחצו <b>Submit new issue</b>, והסניפים עד ${r} ק"מ יישאבו ברקע (רדיוס גדול לוקח יותר זמן, עד כשעה).${c?' בינתיים מוצגים הסניפים שכבר קיימים.':''}`;
+    } else $('#nearMsg').innerHTML=`מוצגים סניפים עד ${r} ק"מ ממך (היישוב הקרוב: ${esc(best)}).`;
+    drawCities(); drawRadii(); if(c) await loadCity();
+  },err=>{$('#nearMsg').textContent=err.code===1?'אין הרשאה למיקום – אפשרו גישה למיקום בהגדרות הדפדפן/הטלפון.':'לא הצלחתי לאתר מיקום. נסו שוב.';},
+  {enableHighAccuracy:false,timeout:15000,maximumAge:60000});
+}
+function keepStores(d,pred){   // תת-קבוצה של סניפים (עם מספור מחדש)
+  const map={},stores=[];
+  d.stores.forEach((st,i)=>{if(pred(st,i)){map[i]=stores.length;stores.push(st);}});
+  const items=[];
+  for(const it of d.items){const p=it[3].filter(e=>e[0] in map).map(e=>[map[e[0]],...e.slice(1)]);
+    if(p.length){const x=[it[0],it[1],it[2],p,it[4],it[5]];x.min=p[0][1];x.max=p[p.length-1][1];x.n=p.length;items.push(x);}}
+  return {stores,items,promos:d.promos};
+}
+async function applyLocation(d,cityName){
+  if(!locMode||locMode.city!==cityName) return keepStores(d,st=>!(st[3]>0));   // מצב רגיל: רק סניפים בתוך העיר
+  const locs=await getLocalities(), me=[locMode.lat,locMode.lon], center=locs[cityName];
+  return keepStores(d,st=>{
+    const xy=(st[5]&&locs[st[5]])||null;
+    const dist=xy?km(me,xy):(center?km(me,center)+(st[3]||0):(st[3]||0));
+    st._me=Math.round(dist*10)/10; return dist<=locMode.r+0.01;});
+}
+// כמה ערים יחד: מאחדים סניפים, מוצרים (לפי ברקוד) ומבצעים
+function mergeCities(list){
+  const multi=list.length>1, stores=[], promos=[], byCode=new Map();
+  for(const {c,d} of list){
+    const so=stores.length, po=promos.length;
+    d.stores.forEach(st=>{const x=[...st]; if(multi) x._city=c.name; stores.push(x);});
+    promos.push(...(d.promos||[]));
+    for(const it of d.items){
+      let x=byCode.get(it[0]); if(!x){x=[it[0],it[1],it[2],[],it[4],it[5]];byCode.set(it[0],x);}
+      for(const e of it[3]) x[3].push([e[0]+so,e[1],...(e[2]?[e[2].map(o=>[o[0],o[1],o[2]+po])]:[])]);
+    }
+  }
+  const items=[...byCode.values()];
+  for(const it of items){it[3].sort((a,b)=>a[1]-b[1]);const p=it[3];it.min=p[0][1];it.max=p[p.length-1][1];it.n=p.length;}
+  return {stores,items,promos};
+}
+let curCityName='';
+async function loadCity(){
+  const sel=meta.cities.filter(c=>selCities.includes(c.slug));
+  if(!sel.length){data=null;$('#list').innerHTML='<div class="muted">בחרו עיר</div>';return;}
+  curCityName=sel[0].name; LS.set('city',sel[0].slug);
+  $('#list').innerHTML='<div class="muted">טוען…</div>';
+  const ok=[], bad=[];
+  for(const c of sel){
+    if(c.error){bad.push(c);continue;}
+    try{ if(!cache[c.slug]) cache[c.slug]=await (await fetch(`data/${c.slug}.json?`+Math.floor(c.updated||meta.updated))).json(); ok.push({c,d:cache[c.slug]}); }
+    catch(e){bad.push({...c,error:'הנתונים לא נטענו'});}
+  }
+  const errHtml=bad.map(c=>`<div class="err" style="margin-bottom:8px">לא הצלחתי למצוא את "${esc(c.name)}": ${esc(c.error)}${c.suggestions&&c.suggestions.length?`<br><br><span style="color:var(--ink)">אולי התכוונת ל: <b>${c.suggestions.map(esc).join('</b>, <b>')}</b> – אפשר להוסיף דרך "➕ עיר אחרת".</span>`:''}</div>`).join('');
+  if(!ok.length){data=null;$('#list').innerHTML=errHtml;$('#meta').textContent='';return;}
+  data=mergeCities(ok); storeNotes(ok);
+  if(ok.length===1) data=await applyLocation(data,ok[0].c.name);
+  else data=keepStores(data,st=>!(st[3]>0));
+  $('#meta').textContent=`${data.items.length.toLocaleString('he-IL')} מוצרים · ${data.stores.length} סניפים${ok.length>1?` ב-${ok.length} ערים`:''} · עודכן ${ago(meta.updated)}`;
+  { const ht=homeTs(); $('#meta').insertAdjacentHTML('beforeend',`<div class="homets ${ht&&Date.now()/1000-ht>HOME_OLD?'hold':''}">🏠 רשתות מהמחשב בבית (ויקטורי, קרפור, סופר-פארם): ${ht?'עודכנו '+ago(ht):'עוד לא נשאבו'}</div>`); }
+  checkStatus();
+  shown=60;draw(); if(errHtml) $('#list').insertAdjacentHTML('afterbegin',errHtml);
+  lastRes=null;selStore=null;renderItems();updArea();if(lines().length&&(compared||tab==='compare'||tab==='deals'))runBasket();
+}
+function filtered(){
+  const q=$('#q').value.trim().toLowerCase();
+  let r=q?(/^\d{4,}$/.test(q.trim())?data.items.filter(it=>it[0].includes(q.trim())):Match.search(data.items,q)):data.items.slice();
+  const f={name:(a,b)=>a[1].localeCompare(b[1],'he'),cheap:(a,b)=>a.min-b.min,gap:(a,b)=>(b.max-b.min)-(a.max-a.min),n:(a,b)=>b.n-a.n}[sort];
+  // בחיפוש: קודם הרלוונטיים ביותר, ובתוך כל רמה – לפי המיון שנבחר
+  return q?r.sort((a,b)=>((b._rel||0)-(a._rel||0))||f(a,b)):r.sort(f);
+}
+function draw(){
+  if(!data)return;
+  const r=filtered();
+  const st=data.stores;
+  $('#list').innerHTML=(r.length?'':'<div class="muted">לא נמצאו מוצרים</div>')+r.slice(0,shown).map((it,i)=>`<div class="item" data-i="${i}">
+    <div class="top"><div><div class="name">${inListBadge(it)}${esc(it[1]||'(ללא שם)')}</div>
+    <div class="sub">${it[2]?esc(it[2])+' · ':''}${it[0][0]==='~'?'<span class="bc">קוד פנימי של הרשת</span>':`<span class="bc">${esc(it[0])}</span>`}</div>
+    <div class="sub">הכי זול ב<b>${esc(stTitle(it[3][0][0]))}</b>${it.n>1?` · עד ${nis(it.max)} · ${it.n} סניפים`:''}</div><div class="locline">📍 ${esc(storeLabel(st[it[3][0][0]]).loc)}</div></div>
+    <div class="price">${nis(it.min)}</div></div>${it[3].some(e=>e[2])?'<div class="promo">🏷️ יש מבצע</div>':''}</div>`).join('')
+    +(r.length>shown?`<button class="more" id="more">הצגת עוד (${(r.length-shown).toLocaleString('he-IL')})</button>`:'');
+  const vis=r.slice(0,shown);
+  document.querySelectorAll('.item').forEach(el=>el.onclick=()=>{
+    const ex=el.querySelector('.det');if(ex){ex.remove();return;}
+    const it=vis[+el.dataset.i];const d=document.createElement('div');d.className='det';
+    d.innerHTML=it[3].map(e=>`<div><span><b>${esc(stTitle(e[0]))}</b><span class="locline">📍 ${esc(storeLabel(st[e[0]]).loc)}</span>${staleTxt(e[0])?' <span class="sub">'+staleTxt(e[0])+'</span>':''}${e[2]?`<br><span class="promo">🏷️ ${esc(promoTxt(e))}</span>`:''}</span><span>${nis(e[1])}</span></div>`).join('');el.appendChild(d);});
+  const m=$('#more');if(m)m.onclick=()=>{shown+=100;draw();};
+  document.querySelectorAll('#list .item').forEach(el=>swipeQty(el,(d,e)=>productDelta(vis[+el.dataset.i],d,e)));
+}
+// ---- החלקה על מוצר מהמלאי מוסיפה אותו לרשימת הקניות (ומקבעת את המוצר הזה) ----
+// ---- החלקה בכל רשימת מוצרים: שמאלה = עוד אחד (+1), ימינה = אחד פחות (−1) ----
+function swipeQty(el,onDelta){
+  let x0=0,y0=0,dx=0,mode='';
+  el.classList.add('swq');
+  el.addEventListener('touchstart',e=>{const t=e.touches[0];x0=t.clientX;y0=t.clientY;dx=0;mode='';el.style.transition='none';},{passive:true});
+  el.addEventListener('touchmove',e=>{const t=e.touches[0],ddx=t.clientX-x0,ddy=t.clientY-y0;
+    if(!mode){if(Math.abs(ddx)>10&&Math.abs(ddx)>Math.abs(ddy)*1.3)mode='h';else if(Math.abs(ddy)>10)mode='v';}
+    if(mode!=='h')return; dx=Math.max(-110,Math.min(110,ddx));
+    el.style.transform=`translateX(${dx}px)`;
+    el.classList.toggle('sw-plus',dx<=-60); el.classList.toggle('sw-minus',dx>=60);},{passive:true});
+  const end=()=>{el.style.transition='transform .2s';el.style.transform='';el.classList.remove('sw-plus','sw-minus');
+    if(mode==='h'&&Math.abs(dx)>=60){ el._swiped=Date.now(); const d=dx<0?1:-1; onDelta(d,el);
+      el.classList.remove('added','removed'); void el.offsetWidth; el.classList.add(d>0?'added':'removed'); }
+    mode='';dx=0;};
+  el.addEventListener('touchend',end);el.addEventListener('touchcancel',end);
+  el.addEventListener('click',e=>{if(el._swiped&&Date.now()-el._swiped<500){e.stopImmediatePropagation();e.preventDefault();}},true);
+}
+// שינוי כמות של שורה ברשימה (לפי המפתח שלה); ב־0 השורה נמחקת, עם אפשרות לבטל
+function bumpLine(k,d,nameIfNew){
+  const ls=lines(); let j=ls.findIndex(l=>keyOf(l)===k);
+  if(j<0){ if(d<0||!nameIfNew) return 0; ls.push(joinLine(nameIfNew,1)); setLines(ls); return 1; }
+  const {name}=splitLine(ls[j]), q=effQty(ls[j])+d;
+  if(d<0&&qtyOv[k]){delete qtyOv[k];saveDeals();}
+  if(q<=0){ const old=ls.slice(); ls.splice(j,1); setLines(ls);
+    notify(`🗑️ <b>${esc(name)}</b> הוסר מהרשימה · <u>ביטול</u>`,()=>setLines(old)); return 0; }
+  ls[j]=joinLine(name,q); setLines(ls); return q;
+}
+// מוצר מהמלאי -> שורה ברשימה (בלי קיבוע: הקיבוע רק בכפתור 📌)
+function nameFor(it){ return cleanLine(it[1].replace(/\*?מבצע\*?/g,' ').replace(W_RE,' ').replace(/[\s\-–]+$/,'').replace(/\s+/g,' ').trim())||it[1]; }
+function lineKeyFor(it){ const k=keyOf(nameFor(it)); if(lines().some(l=>keyOf(l)===k)) return k;
+  const p=lines().find(l=>picks[keyOf(l)]===it[0]); return p?keyOf(p):k; }
+function inListQty(it){ const k=lineKeyFor(it), l=lines().find(l=>keyOf(l)===k); return l?effQty(l):0; }
+function inListBadge(it){const n=inListQty(it);return `<span class="inlist" ${n?'':'hidden'}>🛒 ${n} ברשימה</span>`;}
+function productDelta(it,d,el){
+  if(!it) return; const nm=nameFor(it), k=lineKeyFor(it);
+  const q=bumpLine(k,d,nm);
+  if(d>0) notify(`🛒 <b>${esc(nm)}</b> · ${q===1?'נוסף לרשימה':'סה״כ '+q}`);
+  else if(q>0) notify(`➖ <b>${esc(nm)}</b> · נשארו ${q}`);
+  const bd=el&&el.querySelector('.inlist'); if(bd){ const n=inListQty(it); bd.textContent=`🛒 ${n} ברשימה`; bd.hidden=!n; bd.classList.remove('pop'); void bd.offsetWidth; bd.classList.add('pop'); }
+}
+// ---- סריקת ברקוד במצלמה: BarcodeDetector מובנה (אנדרואיד), ואחרת ZXing (אייפון) – נטען רק כשצריך ----
+let scanStream=null, scanOn=false;
+function stopScan(){ scanOn=false; if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;} $('#scan').hidden=true; }
+// מפענח ZXing-C++ (WebAssembly): מהיר ומדויק בהרבה בברקודים של מוצרים. נטען רק כשפותחים את הסורק.
+let wasmP=null;
+function loadWasm(){
+  return wasmP||(wasmP=new Promise((ok,no)=>{ const sc=document.createElement('script'); sc.src='zxing-wasm.js';
+    sc.onload=()=>{ try{ ZXingWASM.prepareZXingModule({overrides:{locateFile:(p,pre)=>p.endsWith('.wasm')?'zxing_reader.wasm':pre+p},fireImmediately:true}).then(()=>ok(ZXingWASM),no); }catch(e){no(e);} };
+    sc.onerror=no; document.head.appendChild(sc); }));
+}
+const RD_OPTS={formats:['EAN13','EAN8','UPCA'],tryHarder:true,tryRotate:true,tryInvert:false,maxNumberOfSymbols:1};
+// חידוד אופקי (unsharp mask) – מציל ברקודים מטושטשים כשהמצלמה לא ממקדת עד הסוף
+function sharpenH(id,r,amt){
+  const d=id.data, W=id.width, H=id.height, g=new Float32Array(W), out=new Uint8ClampedArray(W);
+  for(let y=0;y<H;y++){ const o=y*W*4;
+    for(let x=0;x<W;x++){ const i=o+x*4; g[x]=d[i]*0.3+d[i+1]*0.59+d[i+2]*0.11; }
+    let acc=0; for(let x=-r;x<=r;x++) acc+=g[Math.min(W-1,Math.max(0,x))];
+    for(let x=0;x<W;x++){ const b=acc/(2*r+1); out[x]=g[x]+amt*(g[x]-b);
+      acc+=g[Math.min(W-1,x+r+1)]-g[Math.max(0,x-r)]; }
+    for(let x=0;x<W;x++){ const i=o+x*4, v=out[x]; d[i]=d[i+1]=d[i+2]=v; }
+  }
+  return id;
+}
+// החלקה אנכית (הפסים אנכיים) – מנקה רעש בלי לטשטש את הפסים
+function smoothV(id,r){
+  const d=id.data, W=id.width, H=id.height, src=new Uint8ClampedArray(d);
+  for(let x=0;x<W;x++){ let acc=0,n=0;
+    for(let y=0;y<Math.min(H,r);y++){acc+=src[(y*W+x)*4];n++;}
+    for(let y=0;y<H;y++){ if(y+r<H){acc+=src[((y+r)*W+x)*4];n++;} if(y-r-1>=0){acc-=src[((y-r-1)*W+x)*4];n--;}
+      const i=(y*W+x)*4, v=acc/n; d[i]=d[i+1]=d[i+2]=v; } }
+  return id;
+}
+async function wasmRead(src){ const Z=await loadWasm(); const r=await Z.readBarcodes(src,RD_OPTS); const ok=r.find(x=>x.isValid&&/^\d{8,13}$/.test(x.text)); return ok?ok.text:null; }
+// אישור קריאה: ברקוד שקיים בנתונים – מיד; אחר – רק אם נקרא אותו מספר פעמיים (מונע מספרים שגויים)
+const inData=c=>data&&data.items.some(it=>it[0]===c||it[0]===c.replace(/^0+/,''));
+let lastRead='', lastReadN=0;
+function confirmRead(code){ if(inData(code)) return true; if(code===lastRead){ if(++lastReadN>=2) return true; } else { lastRead=code; lastReadN=1; } return false; }
+async function openScanner(){
+  lastRead=''; lastReadN=0;
+  $('#scan').hidden=false; $('#scanTxt').textContent='החזיקו את הטלפון כ־15–20 ס״מ מהברקוד, לרוחב';
+  const wp=loadWasm().catch(()=>null);
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ $('#scanTxt').textContent='אין גישה למצלמה חיה – אפשר לצלם תמונה או להקליד'; return; }
+  try{ scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false}); }
+  catch(e){ scanStream=null; $('#scanTxt').textContent='אין גישה למצלמה – אפשר לצלם תמונה או להקליד את המספר'; return; }
+  const v=$('#scanV'); v.srcObject=scanStream; try{await v.play();}catch(e){}
+  const tr=scanStream.getVideoTracks()[0];
+  const tune=async()=>{ try{ const c=tr.getCapabilities?tr.getCapabilities():{}; const adv={};
+    if(c.focusMode&&c.focusMode.includes('continuous')) adv.focusMode='continuous';
+    if(c.zoom) adv.zoom=Math.min(c.zoom.max,Math.max(c.zoom.min,2));
+    if(Object.keys(adv).length) await tr.applyConstraints({advanced:[adv]}); }catch(e){} };
+  tune(); v.onclick=tune;
+  scanOn=true;
+  let det=null;
+  if('BarcodeDetector' in window){ try{ const f=await BarcodeDetector.getSupportedFormats(); if(f.includes('ean_13')) det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a']}); }catch(e){} }
+  const Z=det?null:await wp;
+  if(!det&&!Z){ $('#scanTxt').textContent='לא הצלחתי לטעון את הסורק – אפשר לצלם תמונה או להקליד'; return; }
+  const cv=document.createElement('canvas'), cx=cv.getContext('2d',{willReadFrequently:true}); let round=0;
+  const loop=async()=>{ if(!scanOn) return; let code=null;
+    try{
+      if(det){ const r=await det.detect(v); code=r[0]&&r[0].rawValue; }
+      else if(v.videoWidth){
+        // רצועה במרכז (איפה שהמסגרת), מוקטנת לרוחב 1000 – מהיר ומספיק לברקוד
+        // באותו פריים: רגיל, ואם לא נקרא – מחודד (כל ניסיון כמה אלפיות שנייה), ובכל פריים שלישי גם חידוד חזק
+        const w=v.videoWidth,h=v.videoHeight, cw=Math.round(w*0.9), ch=Math.round(h*0.45), sc=Math.min(1,900/cw);
+        cv.width=Math.round(cw*sc); cv.height=Math.round(ch*sc);
+        cx.drawImage(v,(w-cw)/2,(h-ch)/2,cw,ch,0,0,cv.width,cv.height);
+        const base=cx.getImageData(0,0,cv.width,cv.height), FAST=RD_OPTS;
+        const tries=[()=>base,()=>sharpenH(new ImageData(new Uint8ClampedArray(base.data),base.width,base.height),3,2.5)];
+        if(round++%3===0) tries.push(()=>smoothV(sharpenH(new ImageData(new Uint8ClampedArray(base.data),base.width,base.height),5,4),6));
+        for(const t of tries){ const r=await Z.readBarcodes(t(),FAST); const ok=r.find(x=>x.isValid&&/^\d{8,13}$/.test(x.text)); if(ok){code=ok.text;break;} }
+      }
+    }catch(e){}
+    if(code&&confirmRead(code)){ foundCode(code); return; }
+    requestAnimationFrame(loop); };
+  loop();
+}
+// צילום תמונה עם מצלמת הטלפון הרגילה (פוקוס ומאקרו מלאים) ופענוח מהתמונה
+async function scanPhoto(file){
+  if(!file) return; $('#scanTxt').textContent='מפענח את התמונה…';
+  try{
+    let code=await wasmRead(file);
+    if(!code){ const img=await createImageBitmap(file), c=document.createElement('canvas'), sc=Math.min(1,1600/Math.max(img.width,img.height));
+      c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc); const x=c.getContext('2d'); x.drawImage(img,0,0,c.width,c.height);
+      for(const [r,a] of [[3,2.5],[5,4],[2,1.5]]){ code=await wasmRead(sharpenH(x.getImageData(0,0,c.width,c.height),r,a)); if(code) break; } }
+    if(code){ foundCode(code); return; }
+  }catch(e){}
+  $('#scanTxt').textContent='לא זוהה ברקוד בתמונה. נסו שוב מקרוב יותר, עם תאורה טובה, או הקלידו את המספר.';
+}
+function typeCode(){ const c=prompt('הקלידו את המספר שמתחת לברקוד:'); if(c&&/^\d{4,14}$/.test(c.trim())) foundCode(c.trim()); }
+function foundCode(code){
+  stopScan(); if(navigator.vibrate) navigator.vibrate(60);
+  // בנתונים ברקוד יכול להופיע עם/בלי אפסים מובילים (UPC-A / EAN-13)
+  let q=code; if(data&&!data.items.some(it=>it[0]===q)){ const s=code.replace(/^0+/,''); const hit=data.items.find(it=>it[0].replace(/^0+/,'')===s); if(hit) q=hit[0]; }
+  $('#q').value=q; shown=60; draw();
+  if(data&&!data.items.some(it=>it[0]===q)) similarFor(code);
+}
+// המוצר לא נמכר בסניפים שנבחרו: מחפשים את שמו (מכל הערים) ומציגים מוצרים דומים
+let namesP=null;
+async function similarFor(code){
+  let nm=null;
+  try{ namesP=namesP||fetch(`data/names.json?${Math.round(meta.updated||0)}`).then(r=>r.ok?r.json():{}); const nmap=await namesP;
+    nm=nmap[code]||nmap[code.replace(/^0+/,'')]||nmap['0'+code]; }catch(e){}
+  if(!nm){ notify(`הברקוד ${esc(code)} לא נמכר בסניפים שבחרת, ולא מצאתי אותו גם בערים האחרות.`,null,10000); return; }
+  // מחפשים לפי השם, ומורידים מילים מהסוף (מותג, אריזה) עד שיש תוצאות
+  // בלי גודל האריזה (2 ליטר, 500 גרם...) – אותו מוצר נמכר בגדלים אחרים
+  const clean=nm.replace(/\*?מבצע\*?/g,' ').replace(/\d+(?:[.,]\d+)?\s*(?:ליטר|ל['׳]?|מ["״]?ל|מל|גרם|גר|ג['׳]?|ק["״]?ג|קילו|יח(?:ידות|['׳])?)(?![א-ת])/g,' ')
+    .replace(/[-–,*`'"״׳()]/g,' ').replace(/\b\d+\b/g,' ').replace(/\s+/g,' ').trim(), ws=clean.split(' ');
+  let qq=clean, n=0;
+  for(let k=ws.length;k>=1;k--){ qq=ws.slice(0,k).join(' '); n=Match.search(data.items,qq).length; if(n) break; }
+  if(n){ $('#q').value=qq; shown=60; draw(); }
+  notify(`📦 <b>${esc(nm)}</b> לא נמכר בסניפים שבחרת.${n?` הנה מוצרים דומים (${n}):`:''}`,null,10000);
+}
+$('#scanBtn').onclick=openScanner; $('#scanX').onclick=stopScan;
+$('#scanFile').onchange=e=>{const f=e.target.files[0]; e.target.value=''; scanPhoto(f);};
+$('#scanType').onclick=typeCode;
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&scanOn) stopScan(); });
+let t;$('#q').oninput=()=>{clearTimeout(t);t=setTimeout(()=>{shown=60;draw();},150);};
+// ---- רשימת קניות ----
+let tab=LS.get('tab','prod'), selStore=null, lastRes=null;
+let cmpSel=(()=>{try{return JSON.parse(LS.get('cmpSel','[]'))||[]}catch(e){return []}})();
+const picks=JSON.parse(LS.get('picks','{}'));      // 📌 מוצרים קבועים: שורה -> ברקוד (נשמר לפעם הבאה)
+const tmpPicks={};                                   // החלפה ידנית: שורה -> {סניף: ברקוד} – רק בסניף שבו הוחלף, רק להשוואה הנוכחית
+const pickOf=(k,si)=>((tmpPicks[k]||{})[si])||picks[k];
+function pinLine(k,code){picks[k]=code;delete tmpPicks[k];LS.set('picks',JSON.stringify(picks));runBasket();}
+function unpinLine(k){delete picks[k];delete tmpPicks[k];LS.set('picks',JSON.stringify(picks));runBasket();}
+function itemName(code){if(!data)return '';if(!data._byCode)data._byCode=new Map(data.items.map(it=>[it[0],it]));const it=data._byCode.get(code);return it?it[1]:'';}
+const deals=JSON.parse(LS.get('deals','{}'));      // מבצעים שנדחו: key -> false
+// אישורים מהגרסה הקודמת (true) היו "תקועים" בסניף אחד ובלי ביטול – מוחקים אותם
+for(const k in deals) if(deals[k]!==false) delete deals[k];
+LS.set('deals',JSON.stringify(deals));
+const qtyOv=JSON.parse(LS.get('qtyov','{}'));      // שורה -> {qty, orig, desc, where, key}
+function saveDeals(){LS.set('deals',JSON.stringify(deals));LS.set('qtyov',JSON.stringify(qtyOv));}
+function applyDeal(p,d,where){                      // מימוש מבצע: הגדלת הכמות בשורה – בכל הסניפים
+  const k=keyOf(p.line), orig=(qtyOv[k]&&qtyOv[k].orig)||Match.parseLine(p.line).qty;
+  const cur=p.q.qty, qty=Math.max(cur,Math.ceil(cur/d.mq-1e-9)*d.mq);
+  qtyOv[k]={qty,orig,desc:data.promos[d.offer[2]],where,key:d.key,name:d.it[1]};
+  delete deals[d.key]; saveDeals(); runBasket();}
+function cancelDeal(k){const o=qtyOv[k]; if(!o)return; deals[o.key]=false; delete qtyOv[k]; saveDeals(); runBasket();}
+// ---- שם מסחרי + מיקום לכל סניף ----
+const SUBBRANDS={'שופרסל':[['יוניברס','שופרסל יוניברס'],['אקספרס','שופרסל אקספרס'],['דיל','שופרסל דיל'],['שלי','שופרסל שלי'],['BE','BE'],['ביג','שופרסל ביג']],
+  'דור אלון':[['am-pm','AM:PM'],['am:pm','AM:PM'],['אמ:פמ','AM:PM'],['אלונית','אלונית']],
+  'יינות ביתן / קרפור':[['קרפור סיטי','קרפור סיטי'],['קרפור מרקט','קרפור מרקט'],['קרפור היפר','קרפור היפר'],['קרפור','קרפור'],['יינות ביתן','יינות ביתן']],
+  'רמי לוי':[['שיווק השקמה','רמי לוי']],'ויקטורי':[['ויקטורי','ויקטורי']]};
+function storeLabel(st){
+  if(!st) return {title:'',loc:''};
+  if(st._lab) return st._lab;
+  const chain=st[0], sname=String(st[1]||'');
+  let title=chain, used='';
+  for(const [w,t] of (SUBBRANDS[chain]||[])) if(sname.toLowerCase().includes(w.toLowerCase())){title=t;used=w;break;}
+  // מיקום: כתובת + עיר; אם אין כתובת – מה שנשאר משם הסניף
+  const addr=String(st[4]||'').trim(), city=String(st[5]||'').trim();
+  let loc;
+  if(addr){ loc=addr; if(city&&!Match.norm(addr).includes(Match.norm(city))) loc+=', '+city; }
+  else {
+    loc=sname;
+    for(const w of [chain,used,...chain.split(' / ')].filter(Boolean)) loc=loc.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig'),' ');
+    loc=loc.replace(/\(\d+\)/g,' ').replace(/[|]/g,' ').replace(/^[\s\-–]+|[\s\-–]+$/g,'').replace(/\s+/g,' ').trim();
+    if(!loc) loc=city||st._city||curCityName||sname;
+  }
+  if(!loc) loc=curCityName||'';
+  if(st._city&&!Match.norm(loc).includes(Match.norm(st._city))) loc+=` (${st._city})`;
+  return st._lab={title,loc};
+}
+const stTitle=si=>storeLabel(data.stores[si]).title;
+const stFull=si=>{const l=storeLabel(data.stores[si]);return l.title+' · '+l.loc;};
+const staleTxt=si=>{const t=data.stores[si]&&data.stores[si][2];if(!t)return '';const h=(Date.now()/1000-t)/3600;return h<12?'':`⏳ מחירים מלפני ${h<48?Math.round(h)+' שעות':Math.round(h/24)+' ימים'}`;};
+const promoTxt=e=>e&&e[2]?e[2].map(o=>data.promos[o[2]]).join(' · '):'';
+let compared=false;   // האם כבר בוצעה השוואת מחירים לרשימה
+const TABS=['list','compare','prod','deals','area'];
+function setTab(t){
+  if(!TABS.includes(t)) t=t==='basket'?'list':'prod';
+  tab=t; LS.set('tab',t);
+  TABS.forEach(x=>$('#p-'+x).hidden=x!==t);
+  document.querySelectorAll('#tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  if((t==='compare'||t==='deals')&&data&&lines().length&&!lastRes) runBasket();
+  if(t==='prod'&&!('BarcodeDetector' in window)) setTimeout(()=>loadWasm().catch(()=>{}),1500);   // הסורק מוכן מראש
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('#tabbar button').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
+// בחירת עיר מהפינה למעלה – חלונית קטנה
+$('#areaBtn').onclick=e=>{e.stopPropagation();$('#areaPop').hidden=!$('#areaPop').hidden;};
+$('#popMore').onclick=()=>{$('#areaPop').hidden=true;setTab('area');};
+$('#areaPop').onclick=e=>e.stopPropagation();
+document.addEventListener('click',()=>{$('#areaPop').hidden=true;});
+function updArea(){
+  if(!meta) return;
+  const sel=meta.cities.filter(c=>selCities.includes(c.slug)).map(c=>c.name);
+  $('#areaName').textContent=(sel.join(' + ')||'בחרו עיר')+(locMode?` · ${locMode.r} ק"מ ממני`:'');
+}
+$('#blist').value=LS.get('blist','');
+setTimeout(()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}},0);
+$('#blist').oninput=()=>{LS.set('blist',$('#blist').value);renderItems();};
+$('#blist').addEventListener('paste',()=>setTimeout(()=>{$('#blist').value=cleanText($('#blist').value);LS.set('blist',$('#blist').value);renderItems();},0));
+$('#blist').addEventListener('blur',()=>{const v=cleanText($('#blist').value);if(v!==$('#blist').value){$('#blist').value=v;LS.set('blist',v);renderItems();}});
+// ---- עריכת הרשימה: הוספה, הסרה, כמות ----
+function splitLine(l){                      // "לחם x2" -> {name:"לחם", qty:2}
+  let m=l.match(/^(.*?)\s*[x×*]\s*(\d+)\s*$/i)||l.match(/^(.*?\D)\s+(\d{1,2})\s*$/);
+  if(m) return {name:m[1].trim(),qty:+m[2]||1};
+  m=l.match(/^\s*(\d{1,2})\s+(\D.*)$/); if(m) return {name:m[2].trim(),qty:+m[1]||1};
+  return {name:l.trim(),qty:1};
+}
+const joinLine=(name,q)=>q>1?`${name} x${q}`:name;
+function setLines(arr,recompute=true){
+  $('#blist').value=arr.join('\n'); LS.set('blist',$('#blist').value); renderItems();
+  if(recompute&&compared) runBasket();
+}
+function effQty(l){const ov=qtyOv[keyOf(l)];return Math.max(splitLine(l).qty,ov?ov.qty:0);}
+function renderItems(){
+  const ls=lines();
+  $('#bclear').hidden=!ls.length; $('#bdg-list').textContent=ls.length||'';
+  $('#bitems').innerHTML=ls.length?ls.map((l,i)=>{const {name}=splitLine(l),ov=qtyOv[keyOf(l)],q=effQty(l);
+    const pc=picks[keyOf(l)];
+    const wk=weightKind(l)==='kg'?'kg':'', pq=Match.parseLine(l);   // בחירת משקל – רק למוצרים שקילים
+    const wsl=wk?`<div class="lw"><select data-lw="${i}" aria-label="משקל">${(wk==='kg'?[]:[0]).concat(WEIGHTS).map(g=>`<option value="${g}" ${g===((pq.unit==='g'&&pq.size)||(wk==='kg'?1000:0))?'selected':''}>${g?wTxt(g):'כמות: אריזה'}</option>`).join('')}</select></div>`:'';
+    return `<div class="bitem"><div class="nm">${esc(wk?name.replace(W_RE,' ').replace(/\s+/g,' ').trim()||name:name)}${wsl}${ov&&ov.qty>splitLine(l).qty?'<div class="ovq">🏷️ הוגדל בעקבות מבצע</div>':''}${excl.has(keyOf(l))?`<div class="exq">🚫 לא נכלל בהשוואה <a href="#" data-exback="${esc(keyOf(l))}">החזרה</a></div>`:''}${pc?`<div class="pinq">📌 ${esc(itemName(pc)||'מוצר קבוע')} <a href="#" data-unpinl="${esc(keyOf(l))}">ביטול</a></div>`:''}</div>
+      <div class="step"><button data-dec="${i}" aria-label="פחות">−</button><span>${q}</span><button data-inc="${i}" aria-label="עוד">+</button></div>
+      <button class="rm" data-rm="${i}" aria-label="הסרה">✕</button></div>`;}).join('')
+    :'<div class="muted">הרשימה ריקה – הוסיפו פריטים למטה.</div>';
+  document.querySelectorAll('[data-inc]').forEach(b=>b.onclick=()=>{const ls=lines(),i=+b.dataset.inc,{name}=splitLine(ls[i]);ls[i]=joinLine(name,effQty(ls[i])+1);setLines(ls);});
+  document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=()=>{const ls=lines(),i=+b.dataset.dec,{name}=splitLine(ls[i]),q=effQty(ls[i]);
+    if(q<=1)return; const k=keyOf(ls[i]); if(qtyOv[k]){delete qtyOv[k];saveDeals();}   // הורדת כמות מתחת למבצע – המבצע מתבטל
+    ls[i]=joinLine(name,q-1);setLines(ls);});
+  document.querySelectorAll('select[data-lw]').forEach(sl=>sl.onchange=()=>setWeight(+sl.dataset.lw,+sl.value));
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{const ls=lines();ls.splice(+b.dataset.rm,1);setLines(ls);});
+  document.querySelectorAll('[data-unpinl]').forEach(a=>a.onclick=e=>{e.preventDefault();delete picks[a.dataset.unpinl];LS.set('picks',JSON.stringify(picks));renderItems();if(compared)runBasket();});
+  document.querySelectorAll('#bitems .bitem').forEach((el,i)=>swipeQty(el,d=>{const l=lines()[i]; if(l) bumpLine(keyOf(l),d);}));
+  document.querySelectorAll('#bitems [data-exback]').forEach(a=>a.onclick=e=>{e.preventDefault();excl.delete(a.dataset.exback);saveExcl();renderItems();if(compared)runBasket();});
+}
+$('#bclear').onclick=()=>{
+  if(!confirm('למחוק את כל רשימת הקניות?'))return;
+  for(const k in qtyOv) delete qtyOv[k]; saveDeals();
+  lastRes=null; selStore=null; compared=false; showResults('',''); setLines([],false);
+};
+let showAllStores=false;
+function addItem(){
+  const v=cleanLine($('#badd').value); if(!v){$('#badd').value='';return;}
+  const ls=lines(), {name,qty}=splitLine(v), k=keyOf(v);
+  const j=ls.findIndex(l=>keyOf(l)===k);
+  if(j>=0){ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty);} else ls.push(joinLine(name,qty));
+  $('#badd').value=''; setLines(ls); $('#badd').focus();
+}
+$('#baddBtn').onclick=addItem;
+$('#badd').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addItem();}};
+$('#badd').addEventListener('paste',e=>{     // הדבקת רשימה שלמה לשדה ההוספה
+  const t=(e.clipboardData||window.clipboardData).getData('text'); if(!/\n/.test(t)) return;
+  e.preventDefault(); const ls=lines();
+  for(const raw of t.split(/\r?\n/)){const v=cleanLine(raw); if(!v) continue;
+    const {name,qty}=splitLine(v), k=keyOf(v), j=ls.findIndex(l=>keyOf(l)===k);
+    if(j>=0) ls[j]=joinLine(splitLine(ls[j]).name,effQty(ls[j])+qty); else ls.push(joinLine(name,qty));}
+  setLines(ls);
+});
+$('#bgo').onclick=()=>{selStore=null;runBasket();setTab('compare');};
+// ניקוי שורה מרשימה מודבקת: תבליטים, מספור, אמוג'י, "× 1"; כותרות קטגוריה ("ירקות:") נמחקות
+// שמות קטגוריה נפוצים ברשימות קניות – לא מוצרים
+const CATS=new Set(("ירקות|פירות|ירקות ופירות|פירות וירקות|פירות ירקות|ירק|חלבי|חלביים|מוצרי חלב|חלב ומוצריו|חלב וביצים|מקרר|יבשים|מוצרים יבשים|מזווה|"+
+  "בשרי|בשר ועוף|בשר ודגים|עוף ובשר|דגים ובשר|קצביה|אטליז|קפואים|מוקפאים|קפוא|מקפיא|ניקיון|ניקוי|חומרי ניקוי|כלי ניקוי|טואלטיקה|"+
+  "היגיינה|פארם|טיפוח|משקאות|שתייה|שתיה|מאפים|לחמים|מאפייה|מאפיה|לחם ומאפים|חטיפים|ממתקים|ממתקים וחטיפים|חטיפים וממתקים|תבלינים|"+
+  "רטבים|רטבים ותבלינים|שימורים|קטניות|דגנים|ארוחת בוקר|תינוקות|לתינוק|חד פעמי|חד-פעמי|כלים חד פעמיים|לבית|כללי|שונות|"+
+  "אחר|נוספים|קניות|רשימת קניות|מעדניה|מעדנייה|דליקטסן|משק בית|מוצרי נייר").split("|"));
+function cleanLine(l){
+  l=String(l||'').replace(/[‎‏‪-‮]/g,'').trim();
+  if(!l) return '';
+  if(/[:：]\s*$/.test(l)) return '';                                   // כותרת קטגוריה ("ירקות:")
+  const bare=l.replace(/[\p{Extended_Pictographic}️*#_•\-–—=]/gu,'').replace(/\(\d+\)/g,'').replace(/\s+/g,' ').trim();
+  if(CATS.has(bare)) return '';                                       // כותרת בלי נקודתיים ("חלבי", "🥦 ירקות")
+  l=l.replace(/^[\s•●○◦▪▫■□►▸‣⁃∙·*\-–—✓✔☐☑✅🔲⬜️]+/u,'')               // תבליטים
+     .replace(/^\(?\d{1,2}[.)]\s+/,'')                                  // מספור "1." / "1)"
+     .replace(/^\[[ xX]?\]\s*/,'')                                      // תיבות סימון
+     .replace(/\s*[×xX*]\s*1\s*$/,'')                                   // "× 1" מיותר
+     .trim();
+  return /[\p{L}]/u.test(l)?l:'';
+}
+const cleanText=t=>t.split(/\r?\n/).map(cleanLine).filter(Boolean).join('\n');
+const lines=()=>$('#blist').value.split('\n').map(cleanLine).filter(Boolean);
+const keyOf=l=>Match.parseLine(l).text;
+function sizeTxt(it){return it[5]==='kg'?'נמכר במשקל':it[4]>0?(it[5]==='u'?it[4]+' יח\'':it[4]>=1000?(it[4]/1000)+(it[5]==='ml'?' ל\'':' ק"ג'):it[4]+(it[5]==='ml'?' מ"ל':' גרם')):'';}
+function upTxt(it,p){const u=Match.unitPrice(it,p);if(u==null)return '';return it[5]==='u'?`${nis(u)} ליח'`:it[5]==='ml'?`${nis(u)} לליטר`:`${nis(u)} לק"ג`;}
+// ---- מוצרים שקילים: בחירת משקל, המחיר מחושב לפי המשקל ----
+const WEIGHTS=[100,150,200,250,300,400,500,600,700,750,800,1000,1200,1250,1500,1750,2000,2500,3000,4000,5000];
+const wTxt=g=>g<1000?`${g} גרם`:`${+(g/1000).toFixed(2)} ק"ג`;
+function wSel(i,p,weighed){const cur=(p.q.unit==='g'&&p.q.size)||(weighed?1000:0);
+  const ws=(weighed?[]:[0]).concat(WEIGHTS.includes(cur)||!cur?WEIGHTS:[...WEIGHTS,cur].sort((a,b)=>a-b));
+  return `<div class="wsel">⚖️ ${weighed?'נמכר במשקל – ':''}כמה לקנות? <select data-w="${i}">${ws.map(g=>`<option value="${g}" ${g===cur?'selected':''}>${g?wTxt(g):'אריזה אחת'}${p.q.qty>1?' × '+p.q.qty:''}</option>`).join('')}</select>${weighed?'':'<div class="sub">בבחירת משקל מושווים כל המותגים על אותה כמות בדיוק, גם כשגודל האריזה שונה</div>'}</div>`;}
+const W_RE=/(\d+(?:[.,]\d+)?)\s*(?:ק"?ג|ק״ג|קילו(?:גרם)?|גרם|גר|ג)(?![א-ת])|(?:^|\s)(?:חצי\s*)?(?:קילו(?:גרם)?|ק"ג|ק״ג)(?![א-ת])/g;
+function setWeight(i,g){const ls=lines(); if(!ls[i])return; const {name,qty}=splitLine(ls[i]);
+  const base=name.replace(W_RE,' ').replace(/\s+/g,' ').trim(); ls[i]=joinLine(g?base+' '+wTxt(g):base,qty); setLines(ls);}
+// האם שורה היא מוצר במשקל: 'kg' – בעיקר שקיל (ירקות, בשר), 'g' – ארוז בגרמים (גבינות, אורז), '' – אחר
+const wkCache=new Map(); let wkData=null;
+function weightKind(l){
+  if(!data) return ''; if(wkData!==data){wkCache.clear();wkData=data;Match.prep(data.items);}
+  const q=Match.parseLine(l), k0=keyOf(l);
+  // המוצר שנבחר בפועל קובע: מקובע / הוחלף / נבחר בסניף שבהשוואה – אם הוא נמכר במשקל (למשל גבינה מהמעדנייה)
+  const pc=picks[k0]||(selStore!=null&&tmpPicks[k0]&&tmpPicks[k0][selStore]); const pit=pc&&(itemName(pc),data._byCode.get(pc));
+  if(pit) return pit[5]==='kg'?'kg':'';
+  if(lastRes&&typeof selStore==='number'){ const i=lastRes.parsed.findIndex(p=>p.line===l), st=lastRes.stores.find(s=>s.si===selStore), r=i>=0&&st&&st.rows[i];
+    if(r&&r.weighed) return 'kg'; }
+  if(/במשקל|מעדני/.test(l)) return 'kg';
+  if(wkCache.has(q.text)) return wkCache.get(q.text);
+  const c=Match.candidates(data.items,{...q,size:0,unit:''}); let kg=0,g=0,o=0;
+  for(const it of c){if(it[5]==='kg')kg++;else if(it[5]==='g')g++;else if(it[4]>0)o++;}
+  const k=!c.length?'':kg&&kg>=(g+o)*0.25?'kg':o>kg+g?'':'g'; wkCache.set(q.text,k); return k;}
+// מחיר רגיל (בלי מבצע) באותה כמות שבה מושווה המחיר
+const regOf=r=>r.price*r.used*(r.actual!=null&&r.actual>0?r.cost/r.actual:1);
+// הערה למוצר שמחירו הותאם לכמות המבוקשת (האריזה בסופר בגודל אחר)
+function adjNote(r,p){ if(!r.adjusted) return '';
+  const want=p.q.size*p.q.qty;
+  return `<div class="adj">⚖️ המחיר מותאם ל־${wTxt(want)}, כדי להשוות אותה כמות בכל הסופרים.<br>בפועל קונים ${r.used>1?r.used+' × ':''}${wTxt(r.it[4])}${r.used>1?' = '+wTxt(r.actualG):''} ב־${nis(r.actual)}</div>`;}
+let excl=new Set((()=>{try{return JSON.parse(LS.get('excl','[]'))||[]}catch(e){return []}})());
+function saveExcl(){ LS.set('excl',JSON.stringify([...excl])); }
+function bindExcl(){
+  document.querySelectorAll('#bres [data-ex]').forEach(b=>b.onclick=e=>{e.stopPropagation();excl.add(b.dataset.ex);saveExcl();renderItems();runBasket();});
+  document.querySelectorAll('#bres [data-exback]').forEach(a=>a.onclick=e=>{e.preventDefault();excl.delete(a.dataset.exback);saveExcl();renderItems();runBasket();});
+}
+function showResults(cmp,deals,fromCache){
+  $('#bres').innerHTML=cmp; $('#bempty').hidden=!!cmp;
+  $('#pres').innerHTML=deals; $('#pempty').hidden=!!deals;
+  $('#bdg-deals').textContent=deals&&window._dealCount?window._dealCount:'';
+  if(!fromCache) try{ LS.set('lastCmp',JSON.stringify({l:$('#blist').value,c:selCities.join(','),cmp,deals,n:window._dealCount||0})); }catch(e){}
+}
+// פתיחה מהירה: ההשוואה האחרונה מוצגת מיד, ומתעדכנת כשהנתונים נטענים
+function restoreCmp(){
+  try{ const x=JSON.parse(LS.get('lastCmp','null')); if(!x||!x.cmp||x.l!==$('#blist').value||x.c!==selCities.join(',')) return;
+    window._dealCount=x.n; showResults(x.cmp,x.deals,true); compared=true;
+    $('#bres').insertAdjacentHTML('afterbegin','<div class="muted refreshing">⏳ מעדכן למחירים העדכניים…</div>');
+    $('#bres').style.pointerEvents='none';
+  }catch(e){}
+}
+function runBasket(){
+  $('#bres').style.pointerEvents='';
+  if(!data){showResults('<div class="muted">אין נתונים לעיר הזו</div>','');return;}
+  const all=lines(); if(!all.length){compared=false;showResults('','');return;}
+  { const live=new Set(all.map(keyOf)); let ch=false; for(const k of [...excl]) if(!live.has(k)){excl.delete(k);ch=true;} if(ch) saveExcl(); }
+  const ls=all.filter(l=>!excl.has(keyOf(l)));
+  const exH=excl.size?`<div class="exbox">🚫 לא נכללים בהשוואה: ${all.filter(l=>excl.has(keyOf(l))).map(l=>`<span class="exchip">${esc(splitLine(l).name)} <a href="#" data-exback="${esc(keyOf(l))}">↩️ החזרה</a></span>`).join(' ')}</div>`:'';
+  if(!ls.length){compared=true;showResults('<h3>השוואה בין הסניפים</h3>'+exH+'<div class="muted">כל הפריטים הוצאו מההשוואה.</div>','');bindExcl();return;}
+  compared=true;
+  const live=new Set(ls.map(keyOf)); let dirty=false;
+  for(const k in qtyOv) if(!live.has(k)){delete qtyOv[k];dirty=true;}   // שורה שנמחקה – המבצע שלה מתבטל
+  for(const l of ls){const k=keyOf(l); if(qtyOv[k]&&Match.parseLine(l).qty>=qtyOv[k].qty){delete qtyOv[k];dirty=true;}}  // הכמות שהוקלדה כבר מספיקה
+  if(dirty) saveDeals();
+  renderItems();
+  const res=Match.compareBasket(data,ls.map(l=>({line:l,pick:picks[keyOf(l)],tmp:tmpPicks[keyOf(l)],qty:qtyOv[keyOf(l)]&&qtyOv[keyOf(l)].qty})),deals);lastRes=res;
+  const n=ls.length;
+  if(selStore==null) selStore=res.stores[0].si;
+  const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
+  let h='<h3>השוואה בין הסניפים</h3>';
+  // סניפים זולים יותר שחסרים בהם פריטים (לכן הם לא בראש הרשימה)
+  { const best=res.stores[0];
+    // משווים על הפריטים המשותפים בלבד – אחרת סניף נראה "זול" רק כי חסרים בו פריטים
+    const cmp=s=>{let a=0,b=0;best.rows.forEach((r,i)=>{if(r&&s.rows[i]){a+=s.rows[i].cost;b+=r.cost;}});return {mine:a,ref:b};};
+    const cheaper=res.stores.slice(1).filter(s=>s.found<best.found&&best.found-s.found<=Math.max(2,Math.ceil(n*0.25))).map(s=>({s,...cmp(s)})).filter(x=>x.mine<x.ref-0.5).sort((a,b)=>(a.mine-a.ref)-(b.mine-b.ref));
+    if(cheaper.length){ const c0=cheaper[0].s, mi=res.parsed.filter((p,i)=>!c0.rows[i]).map(p=>splitLine(p.line).name);
+      h+=`<div class="cheapnote" data-si="${c0.si}">💡 ${cheaper.length===1?'יש סניף זול יותר':`יש ${cheaper.length} סניפים זולים יותר`} שחסרים בו פריטים: <b>${esc(stTitle(c0.si))}</b> – ${nis(cheaper[0].mine)} לעומת ${nis(cheaper[0].ref)} ב${esc(stTitle(best.si))} על אותם פריטים. חסר שם: ${esc(mi.slice(0,3).join(', '))}${mi.length>3?` ועוד ${mi.length-3}`:''}.
+        <div class="sub">אפשר להוציא את הפריטים החסרים מההשוואה (למטה), או ללחוץ כאן כדי לראות את הסניף.</div></div>`; } }
+  const full=res.stores.filter(s=>s.found===n), dearest=full.length?Math.max(...full.map(s=>s.total)):0;
+  let shownStores=showAllStores?res.stores:res.stores.slice(0,5);
+  if(!showAllStores&&typeof selStore==='number'&&!shownStores.some(s=>s.si===selStore)) shownStores=[...shownStores,res.stores.find(s=>s.si===selStore)];
+  h+=shownStores.map((s,i)=>{
+    const promos=s.rows.filter(r=>r&&r.promo).length;
+    const nAlt=s.rows.filter(r=>r&&(r.alt||r.fallback)).length;
+    const info=[s.found===n?'כל הפריטים':`<span class="miss">חסרים ${n-s.found}</span>`, nAlt?`🔄 ${nAlt} חלופות`:'',
+      promos?`🏷️ ${promos} מבצעים`:'', s.offers?`❓ ${s.offers} לאישור`:'', staleTxt(s.si)].filter(Boolean).join(' · ');
+    const save=i===0&&s.found===n&&dearest-s.total>0.5?`<div class="save">חוסך ${nis(dearest-s.total)} לעומת היקר</div>`:'';
+    return `<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}"><div class="top"><div>
+      <b>${esc(stTitle(s.si))}</b>${i===0&&s.found===n?'<span class="badge">הכי זול</span>':''}
+      <div class="loc">📍 ${esc(storeLabel(data.stores[s.si]).loc)}${data.stores[s.si]._me!=null&&locMode?` · ${data.stores[s.si]._me} ק"מ ממך`:''}</div>
+      <div class="info">${info}</div>${save}<button class="ctog ${cmpSel.includes(s.si)?'on':''}" data-ct="${s.si}">${cmpSel.includes(s.si)?'☑ בטבלה':'☐ לטבלת השוואה'}</button></div><div class="tot">${nis(s.total)}</div></div></div>`;}).join('');
+  // פריטים שחסרים בחלק מהסניפים – אפשר להוציא אותם, כדי שכל הסניפים יושוו על אותם פריטים
+  // נבדקים: הסניפים המוצגים + הסניף שנבחר + הסניפים שבטבלה. "חסר" = לא נמכר, או שמוצגת חלופה / מוצר אחר במקום המקובע
+  const careSt=[...new Set([...shownStores,...cmpSel.map(si=>res.stores.find(s=>s.si===si)).filter(Boolean)])];
+  const miss=res.parsed.map((p,i)=>({p,i,where:careSt.filter(s=>!s.rows[i]||s.rows[i].alt||s.rows[i].fallback)})).filter(x=>x.where.length);
+  let missH='';
+  if(miss.length) missH=`<div class="missbox"><b>🧺 חסרים פריטים בחלק מהסניפים.</b> כדי להשוות את כולם על אותם פריטים, אפשר להוציא פריטים מההשוואה:
+    ${miss.map(x=>`<div class="mrow"><div><b>${esc(splitLine(x.p.line).name)}</b><div class="sub">${(()=>{const no=x.where.filter(s=>!s.rows[x.i]), al=x.where.filter(s=>s.rows[x.i]);
+      const nm=a=>a.slice(0,3).map(s=>esc(stTitle(s.si))).join(', ')+(a.length>3?` ועוד ${a.length-3}`:'');
+      return [no.length?`חסר ב: ${nm(no)}`:'', al.length?`🔄 מוצר חלופי ב: ${nm(al)}`:''].filter(Boolean).join('<br>');})()}</div></div><button data-ex="${esc(keyOf(x.p.line))}">הוצאה</button></div>`).join('')}
+    ${miss.length>1?`<button class="morebtn" id="exAll">הוצאת כל ${miss.length} הפריטים החסרים</button>`:''}</div>`;
+
+  if(mixedTot<res.stores[0].total-0.5||selStore==='mix')
+    h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="info">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · <span class="miss">חסרים ${n-mixedFound}</span>`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
+  if(res.stores.length>5) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 5 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
+  h+=missH+exH;
+  const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
+  const title=selStore==='mix'?'סל משולב':stFull(selStore);
+  // ---- לוח מבצעים ----
+  const storeName=si=>stFull(si);
+  const realized=res.parsed.map((p,i)=>({p,i,o:qtyOv[keyOf(p.line)]})).filter(x=>x.o);
+  const autoUsed=res.parsed.map((p,i)=>({p,r:rows[i]})).filter(x=>x.r&&x.r.promo);
+  const avail=[];
+  res.parsed.forEach((p,i)=>{const r=rows[i]; const si=selStore==='mix'?(r&&r.si):selStore; if(si==null)return;
+    // מוצר מקובע – מבצעים רק עליו, לא על מוצרים דומים
+    const pc=picks[keyOf(p.line)], pit=pc&&(itemName(pc),data._byCode.get(pc));
+    Match.dealsFor(pc?(pit?[pit]:[]):p.cands,si).filter(d=>d.mq>p.q.qty+1e-9&&!(r&&r.promo&&Match.dealKey(r.it,r.promo)===d.key)).slice(0,3)
+      .forEach(d=>avail.push({p,i,d,si}));});
+  window._avail=avail;
+  const saved=autoUsed.reduce((a,x)=>a+Math.max(0,regOf(x.r)-x.r.cost),0);
+  // ---- טבלת השוואה: עד 3 סניפים מסומנים, שורה לכל מוצר ----
+  cmpSel=cmpSel.filter(si=>res.stores.some(s=>s.si===si));
+  if(cmpSel.length===1) h+='<div class="muted" style="margin:4px 0 8px">סמנו עוד סניף אחד או שניים כדי לראות טבלת השוואה.</div>';
+  if(cmpSel.length>=2){
+    // הזול ביותר בעמודה הראשונה (מימין), אחריו לפי הסדר; סניף שחסרים בו מוצרים – בסוף
+    const cs=cmpSel.map(si=>res.stores.find(s=>s.si===si)).sort((a,b)=>(b.found-a.found)||(a.total-b.total));
+    h+=`<h3 id="ctabH">טבלת השוואה</h3><div class="ctabw"><table class="ctab"><thead><tr><th>מוצר</th>${cs.map(s=>`<th>${esc(stTitle(s.si))}<div class="loc">${esc(storeLabel(data.stores[s.si]).loc)}</div></th>`).join('')}</tr></thead><tbody>`;
+    h+=res.parsed.map((p,i)=>{const rs=cs.map(s=>s.rows[i]); const ok=rs.filter(Boolean).map(r=>r.cost); const mn=ok.length>1?Math.min(...ok):null;
+      return `<tr><td class="cn">${esc(p.line)}</td>${rs.map(r=>r?`<td class="${mn!=null&&r.cost<=mn+0.005?'best':''}"><b>${nis(r.cost)}</b>${r.promo?' 🏷️':''}<div class="cp">${r.alt||r.fallback?'🔄 ':''}${esc(r.it[1])}</div>${r.adjusted?`<div class="cp adjc">⚖️ מותאם · בפועל ${wTxt(r.actualG)} ב־${nis(r.actual)}</div>`:''}</td>`:'<td class="na">—<div class="cp">לא נמכר</div></td>').join('')}</tr>`;}).join('');
+    const tots=cs.map(s=>s.total), full=cs.map(s=>s.found===n), mt=Math.min(...tots.filter((t,j)=>full[j]).concat([Infinity]));
+    h+=`</tbody><tfoot><tr><td>סה"כ</td>${cs.map((s,j)=>`<td class="${full[j]&&s.total<=mt+0.005?'best':''}"><b>${nis(s.total)}</b>${full[j]?'':`<div class="cp miss">חסרים ${n-s.found}</div>`}</td>`).join('')}</tr></tfoot></table></div>
+      <button class="morebtn" id="ctClear">ניקוי הסימון</button>`;
+  }
+  const rankH=h; h='';
+  window._dealCount=realized.length+avail.length;
+  h+=`<div class="plist"><div class="muted">בסניף: <b>${esc(title)}</b> · ${realized.length} מומשו בהגדלת כמות · ${autoUsed.length} בסל · ${avail.length} זמינים. החליפו סניף בלשונית "השוואה".</div>`;
+  if(realized.length) h+='<h4>מומשו – הכמות הוגדלה בכל הסניפים</h4>'+realized.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${x.o.orig} ← ${x.o.qty}<div class="sub">${esc(x.o.desc)} · ${esc(x.o.where)}</div></div><button data-cancel="${esc(keyOf(x.p.line))}">ביטול</button></div>`).join('');
+  if(autoUsed.length) h+=`<h4>נכללו בסל ב${esc(title)}${saved>0.005?` · חיסכון ${nis(saved)}`:''}</h4>`+autoUsed.map(x=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.r.it[1])}<div class="sub">${esc(data.promos[x.r.promo[2]])}</div></div><span class="promo">−${nis(Math.max(0,regOf(x.r)-x.r.cost))}</span></div>`).join('');
+  if(avail.length) h+=`<h4>מבצעי כמות זמינים${selStore==='mix'?'':' ב'+esc(title)}</h4>`+avail.map((x,j)=>`<div class="prow"><div><b>${esc(x.p.line)}</b>: ${esc(x.d.it[1])}<div class="sub">${esc(data.promos[x.d.offer[2]])} · ${x.d.mq} ב-${nis(x.d.bundle)} (${nis(x.d.unit)} ליח' במקום ${nis(x.d.price)})${selStore==='mix'?' · '+esc(storeName(x.si)):''}</div></div><button class="add" data-add="${j}">הוספה</button></div>`).join('');
+  if(!realized.length&&!autoUsed.length&&!avail.length) h+='<div class="sub" style="padding-bottom:8px">אין מבצעים רלוונטיים לרשימה הזו</div>';
+  h+='</div>';
+  const promoH=h; h='';
+  h+=`<h3>הפירוט – ${esc(title)}</h3>`;
+  h+=res.parsed.map((p,i)=>{const r=rows[i];const k=keyOf(p.line),pinned=!!picks[k];
+    if(!r) return `<div class="line" data-li="${i}"><div class="q">${esc(p.line)}</div><div class="sub miss">${p.cands.length?'לא נמכר בסניף הזה':'לא נמצא מוצר מתאים – נסו לנסח אחרת'}</div><button class="swap" data-i="${i}">בחירת מוצר</button>${pinned?` <button class="swap" data-unpin="${esc(k)}">📌 ביטול הקיבוע</button>`:''}</div>`;
+    const it=r.it, si=selStore==='mix'?r.si:selStore;
+    const ov=qtyOv[keyOf(p.line)];
+    const promoLine=(r.promo?`<div class="promo">🏷️ ${esc(data.promos[r.promo[2]])}</div>`:'')
+      +(ov?`<div class="promo">⬆️ הכמות הוגדלה מ-${ov.orig} ל-${ov.qty} בעקבות מבצע (בכל הסניפים) <a href="#" data-cancel="${esc(keyOf(p.line))}" style="color:inherit">ביטול</a></div>`:'');
+    const regular=regOf(r);
+    let offer='';
+    if(r.offer){const o=r.offer;offer=`<div class="offer">🏷️ <b>מבצע:</b> ${esc(data.promos[o.offer[2]])}<br>
+      ${esc(o.it[1])} – ${o.mq} ב-${nis(o.bundle)} (${nis(o.unit)} ליחידה במקום ${nis(o.price)})<br>להגדיל את הכמות ל-${o.mq} ולממש את המבצע?
+      <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
+    return `<div class="line" data-li="${i}"><div class="top"><div><div class="q">${esc(p.line)}</div>
+      <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.packs?(!r.adjusted&&r.used>1?` <span class="muted">× ${r.used} אריזות</span>`:''):r.used!==1?` <span class="muted">× ${r.used}</span>`:''}${r.pc>1?` <span class="muted">· 📦 מארז ${r.pc} יח'</span>`:''}</div>${r.weighed?wSel(i,p,true):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,(r.actual??r.cost)/r.used)].filter(Boolean).join(' · '))}</div>${it[0][0]!=='~'?`<div class="bcode">ברקוד ${esc(it[0])}</div>`:''}${adjNote(r,p)}${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
+      ${promoLine}${r.alt?`<div class="lock altl">🔄 חלופה: "${esc(splitLine(p.line).name)}" לא נמכר בסניף הזה – מוצג מוצר דומה</div>`:r.manual?'<div class="lock">↔️ הוחלף ידנית בסניף הזה (בשאר הסניפים – הזול ביותר)</div>':r.fallback?`<div class="lock">ℹ️ המוצר הקבוע "${esc(itemName(picks[k])||'')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:r.pinned?'<div class="lock">📌 מוצר קבוע – מוצג בכל הסניפים, בלי קשר למחיר</div>':''}</div>
+      <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
+      ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
+        ?`<button class="swap pinon" data-unpin="${esc(k)}">📌 קבוע · ביטול</button>`
+        :`<button class="swap" data-pin="${i}">📌 לקבע מוצר זה</button>`}</div></div>`;}).join('');
+  showResults(rankH+h,promoH);
+  document.querySelectorAll('.store').forEach(el=>el.onclick=()=>{selStore=el.dataset.si==='mix'?'mix':+el.dataset.si;runBasket();
+    setTimeout(()=>{const d=[...document.querySelectorAll('#bres h3')].pop();if(d)d.scrollIntoView({behavior:'smooth',block:'start'});},30);});
+  document.querySelectorAll('[data-ct]').forEach(b=>b.onclick=e=>{e.stopPropagation();const si=+b.dataset.ct,j=cmpSel.indexOf(si);
+    if(j>=0)cmpSel.splice(j,1); else {if(cmpSel.length>=3){notify('אפשר לסמן עד 3 סניפים לטבלה');return;} cmpSel.push(si);}
+    LS.set('cmpSel',JSON.stringify(cmpSel)); runBasket();
+    if(cmpSel.length>=2) setTimeout(()=>{const t=$('#ctabH');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});},30);});
+  const cc=$('#ctClear'); if(cc) cc.onclick=()=>{cmpSel=[];LS.set('cmpSel','[]');runBasket();};
+  const mb=$('#moreStores'); if(mb) mb.onclick=()=>{showAllStores=!showAllStores;runBasket();};
+  const cn=document.querySelector('.cheapnote'); if(cn) cn.onclick=()=>{selStore=+cn.dataset.si;showAllStores=true;runBasket();
+    setTimeout(()=>{const el=document.querySelector(`.store[data-si="${cn.dataset.si}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},30);};
+  bindExcl();
+  const ea=$('#exAll'); if(ea) ea.onclick=()=>{miss.forEach(x=>excl.add(keyOf(x.p.line)));saveExcl();renderItems();runBasket();};
+  // החלקה על פריט בפירוט: שמאלה +1, ימינה −1
+  document.querySelectorAll('#bres .line[data-li]').forEach(el=>swipeQty(el,d=>{const p=res.parsed[+el.dataset.li]; if(p) bumpLine(keyOf(p.line),d);}));
+  document.querySelectorAll('select[data-w]').forEach(sl=>{sl.onclick=e=>e.stopPropagation();sl.onchange=()=>setWeight(lines().indexOf(res.parsed[+sl.dataset.w].line),+sl.value);});
+  document.querySelectorAll('.swap[data-i]').forEach(b=>b.onclick=()=>openPicker(+b.dataset.i));
+  document.querySelectorAll('[data-pin]').forEach(b=>b.onclick=()=>{const i=+b.dataset.pin;pinLine(keyOf(res.parsed[i].line),rows[i].it[0]);});
+  document.querySelectorAll('[data-unpin]').forEach(b=>b.onclick=()=>unpinLine(b.dataset.unpin));
+  document.querySelectorAll('[data-deal]').forEach(b=>b.onclick=()=>{deals[b.dataset.deal]=false;saveDeals();runBasket();});
+  document.querySelectorAll('[data-yes]').forEach(b=>b.onclick=()=>{const i=+b.dataset.yes,p=res.parsed[i],r=rows[i],si=selStore==='mix'?r.si:selStore;
+    const o=r.offer; applyDeal(p,{mq:o.mq,offer:o.offer,key:Match.dealKey(o.it,o.offer),it:o.it},storeName(si));});
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{e.preventDefault();const x=window._avail[+b.dataset.add];applyDeal(x.p,x.d,storeName(x.si));});
+  document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();cancelDeal(b.dataset.cancel);});
+
+}
+function openPicker(i){
+  const p=lastRes.parsed[i], key=keyOf(p.line);
+  const si=selStore==='mix'?(lastRes.mixed[i]&&lastRes.mixed[i].si):selStore;   // הסניף שבו מחליפים
+  const auto=Match.candidates(data.items,p.q);
+  // בבחירה ידנית – כל הגדלים (גם מארזים ושישיות), לא רק הגודל הנפוץ
+  const exact=auto.length?(auto.wide&&!p.q.size?auto.wide:auto):Match.candidates(data.items,{...p.q,size:0});
+  // גם חלופות מתאימות (מותג אחר מאותו סוג – למשל מים אחרים במקום מי עדן)
+  const altSet=new Set(), alts=(p.altFn?p.altFn():[]).filter(it=>!exact.includes(it)); alts.forEach(it=>altSet.add(it[0]));
+  // ועוד חלופות רחבות: לפי המילה/שתי המילים הראשונות (זיתים ירוקים בית השיטה -> זיתים ירוקים -> זיתים)
+  { const seen=new Set([...exact,...alts].map(it=>it[0]));
+    // לפי "שם האוכל" שבשורה/בשם המוצר (נלמד מהנתונים) – זיתים, טונה, גבינה...
+    const qs=[...Match.foodQueries(p.q.text,data.items), ...(exact[0]?Match.foodQueries(exact[0][1],data.items):[])];
+    for(const qt of [...new Set(qs)]) for(const it of Match.candidates(data.items,{...p.q,text:qt,size:0,unit:''})) if(!seen.has(it[0])){seen.add(it[0]);altSet.add(it[0]);alts.push(it);} }
+  let pool=exact.concat(alts);
+  const inStore=si!=null&&pool.some(it=>Match.priceIn(it,si)!=null);
+  if(inStore) pool=pool.filter(it=>Match.priceIn(it,si)!=null);                 // רק מוצרים שנמכרים בסניף הזה
+  const cheapest=it=>{if(inStore)return [si,Match.priceIn(it,si)];let b=null;for(const [s,pr] of it[3]) if(!b||pr<b[1]) b=[s,pr];return b;};
+  const up=x=>Match.unitPrice(x.it,x.c[1])??x.c[1]*1000;
+  pool=pool.map(it=>({it,c:cheapest(it),alt:altSet.has(it[0])})).sort((a,b)=>(a.alt-b.alt)||(up(a)-up(b))).slice(0,50);
+  $('#psheet').innerHTML=`<div class="top"><b>${esc(p.line)}</b><button class="swap" id="pclose">סגירה</button></div>
+    <label class="pinbox"><input type="checkbox" id="ppin" ${picks[key]?'checked':''}> 📌 לקבע את המוצר שאבחר – ייבחר תמיד גם בפעם הבאה, בלי קשר למחיר</label>
+    <input id="psearch" type="search" placeholder="חיפוש מוצר אחר…" style="margin:10px 0">
+    <div class="muted">${si!=null?`בלי סימון – ההחלפה רק ב<b>${esc(stTitle(si))}</b>. בשאר הסניפים יוצג הזול ביותר.`:''}</div>
+    <div class="opt" data-b=""><b>אוטומטי</b><div class="sub">הכי זול שמתאים, בכל סניף בנפרד (מבטל קיבוע והחלפה)</div></div><div id="popts"></div>`;
+  const draw=list=>{let altHead=false;$('#popts').innerHTML=list.map(({it,c,alt})=>`${alt&&!altHead&&(altHead=true)?'<div class="phead">🔄 חלופות מתאימות (מותג או גודל אחר)</div>':''}<div class="opt" data-b="${esc(it[0])}"><div class="top"><div>${esc(it[1])}<div class="sub">${esc([sizeTxt(it),upTxt(it,c[1]),inStore?'מחיר בסניף הזה':'הכי זול ב'+stTitle(c[0])].filter(Boolean).join(' · '))}${pickOf(key,si)===it[0]?(picks[key]===it[0]?' · 📌 קבוע':' · נבחר'):''}</div></div><div class="p">${nis(c[1])}</div></div></div>`).join('')||'<div class="muted">אין תוצאות</div>';
+    document.querySelectorAll('#picker .opt').forEach(o=>o.onclick=()=>{
+      const b=o.dataset.b, pin=$('#ppin').checked;
+      if(!b){delete picks[key];delete tmpPicks[key];}
+      else if(pin){picks[key]=b;delete tmpPicks[key];}
+      else if(si!=null){(tmpPicks[key]=tmpPicks[key]||{})[si]=b;}
+      LS.set('picks',JSON.stringify(picks));$('#picker').style.display='none';runBasket();});};
+  draw(pool);
+  $('#psearch').oninput=()=>{const t=$('#psearch').value.trim();if(!t){draw(pool);return;}
+    const r=Match.candidates(data.items,Match.parseLine(t)).map(it=>({it,c:cheapest(it)})).filter(x=>x.c&&x.c[1]!=null).sort((a,b)=>a.c[1]-b.c[1]).slice(0,40);draw(r);};
+  $('#pclose').onclick=()=>$('#picker').style.display='none';
+  $('#picker').onclick=e=>{if(e.target.id==='picker')$('#picker').style.display='none';};
+  $('#picker').style.display='flex';
+}
+
+// ---- התקנה כאפליקציה ----
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+let deferred=null;
+function showInstall(){ if(standalone||LS.get('noInstall','')) return; $('#install').style.display='flex'; }
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;showInstall();});
+if(isIOS&&!standalone){ $('#installText').innerHTML='להתקנה: לחצו על <b>שיתוף</b> (ריבוע עם חץ למעלה) ואז <b>"הוספה למסך הבית"</b>'; $('#installBtn').hidden=true; showInstall(); }
+$('#installBtn').onclick=async()=>{ if(!deferred)return; deferred.prompt(); await deferred.userChoice; deferred=null; $('#install').style.display='none'; };
+$('#installX').onclick=()=>{ LS.set('noInstall','1'); $('#install').style.display='none'; };
+addEventListener('appinstalled',()=>{$('#install').style.display='none';});
+
+restoreCmp();
+setTab(tab);
+renderItems();
+init().catch(e=>$('#list').innerHTML=`<div class="err">הנתונים עוד לא מוכנים – ההרצה הראשונה לוקחת כחצי שעה. (${esc(e.message)})</div>`);
+</script></body></html>
