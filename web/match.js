@@ -283,9 +283,9 @@
       if (W && it[5] === "kg" && W.u !== "g") continue;
       // מארז של כמה יחידות (שישייה): כמות 6 -> שישייה אחת או 6 בודדים; מארז גדול מהכמות – לא
       const pc = it.pc || 1;
-      if (cands.allSizes && cands.target && it[4] > 0 && (usz(it) > Math.max(cands.target * 3.2, 2000) || usz(it) < cands.target / 3.2)) continue;
+      if (!cands.chosen && cands.allSizes && cands.target && it[4] > 0 && (usz(it) > Math.max(cands.target * 3.2, 2000) || usz(it) < cands.target / 3.2)) continue;
       let mpacks = 0;
-      if (!W && pc > 1) { if (pc > qty * 1.25) continue; mpacks = Math.ceil(qty / pc - 1e-9); if (mpacks * pc > qty * 1.5) continue; }
+      if (!W && pc > 1 && !cands.chosen) { if (pc > qty * 1.25) continue; mpacks = Math.ceil(qty / pc - 1e-9); if (mpacks * pc > qty * 1.5) continue; }
       const amt = it[5] === "kg" ? Math.round(W ? W.v : qty * 1000) / 1000 : packs ? packs : mpacks || qty;
       const opts = [{ cost: amt * price, used: amt, promo: null }];
       for (const o of (e[2] || [])) {
@@ -371,10 +371,13 @@
     const bestPick = (p, si) => {
       const W = gramsOf(p);
       const bestIn_ = (c, s, q, d) => bestIn(c, s, q, d, W);
+      // מוצר שבחרת (החלפה / 📌): הכמות היא מספר הפריטים מהמוצר הזה בדיוק – בלי כללי גודל ומארזים
+      const chosen = it => { const a = [it]; a.chosen = true; return a; };
+      const Wc = W && W.explicit !== false && typeof W === "number" ? W : 0;
       const t = p.tmp[si] && byCode.get(p.tmp[si]);
-      if (t) { const b = bestIn_([t], si, p.q.qty, deals); if (b) { b.manual = true; return b; } }
+      if (t) { const b = bestIn(chosen(t), si, p.q.qty, deals, Wc); if (b) { b.manual = true; return b; } }
       if (p.pinned) {
-        const b = bestIn_([p.pinned], si, p.q.qty, deals);
+        const b = bestIn(chosen(p.pinned), si, p.q.qty, deals, Wc);
         if (b) { b.pinned = true; return b; }
         const f = bestIn_(p.cands, si, p.q.qty, deals);   // הקבוע לא נמכר כאן – הזול ביותר בסניף
         if (f) { f.fallback = true; delete f.offer; }   // בלי הצעות מבצע על מוצר דומה
