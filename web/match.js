@@ -245,6 +245,7 @@
       }
       return (p._alt = out);
     };
+    parsed.forEach(p => { p.altFn = () => altCands(p); });   // לבחירה ידנית (החלפה)
     const pick = (p, si) => {
       const b = bestPick(p, si);
       if (b || p.tmp[si]) return b;

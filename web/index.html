@@ -141,6 +141,8 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 @media (prefers-color-scheme:dark){.missbox{background:#3a2e12;border-color:#c99a3a;color:#fbeecf}.missbox .sub{color:#e2cf9e}.missbox .mrow{border-top-color:#5c4a1c}
  .missbox .mrow button,.missbox .morebtn{background:#2a2108;color:#fbd98a;border-color:#c99a3a}}
 .altl{color:#b45309;font-weight:600}@media (prefers-color-scheme:dark){.altl{color:#f0b35a}}
+.cheapnote{background:var(--soft);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin:6px 0 10px;font-size:14.5px;color:var(--ink);cursor:pointer}
+.cheapnote .sub{color:var(--muted);font-size:12.5px;margin-top:3px}.phead{font-weight:700;font-size:14px;margin:12px 2px 4px;color:#b45309}
 .exq{font-size:13px;font-weight:600;color:var(--err);margin-top:3px}.exq a{color:var(--accent)}
 
 #modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -891,6 +893,14 @@ function runBasket(){
   if(selStore==null) selStore=res.stores[0].si;
   const mixedTot=res.mixed.reduce((a,b)=>a+(b?b.cost:0),0), mixedFound=res.mixed.filter(Boolean).length;
   let h='<h3>השוואה בין הסניפים</h3>';
+  // סניפים זולים יותר שחסרים בהם פריטים (לכן הם לא בראש הרשימה)
+  { const best=res.stores[0];
+    // משווים על הפריטים המשותפים בלבד – אחרת סניף נראה "זול" רק כי חסרים בו פריטים
+    const cmp=s=>{let a=0,b=0;best.rows.forEach((r,i)=>{if(r&&s.rows[i]){a+=s.rows[i].cost;b+=r.cost;}});return {mine:a,ref:b};};
+    const cheaper=res.stores.slice(1).filter(s=>s.found<best.found&&best.found-s.found<=Math.max(2,Math.ceil(n*0.25))).map(s=>({s,...cmp(s)})).filter(x=>x.mine<x.ref-0.5).sort((a,b)=>(a.mine-a.ref)-(b.mine-b.ref));
+    if(cheaper.length){ const c0=cheaper[0].s, mi=res.parsed.filter((p,i)=>!c0.rows[i]).map(p=>splitLine(p.line).name);
+      h+=`<div class="cheapnote" data-si="${c0.si}">💡 ${cheaper.length===1?'יש סניף זול יותר':`יש ${cheaper.length} סניפים זולים יותר`} שחסרים בו פריטים: <b>${esc(stTitle(c0.si))}</b> – ${nis(cheaper[0].mine)} לעומת ${nis(cheaper[0].ref)} ב${esc(stTitle(best.si))} על אותם פריטים. חסר שם: ${esc(mi.slice(0,3).join(', '))}${mi.length>3?` ועוד ${mi.length-3}`:''}.
+        <div class="sub">אפשר להוציא את הפריטים החסרים מההשוואה (למטה), או ללחוץ כאן כדי לראות את הסניף.</div></div>`; } }
   const full=res.stores.filter(s=>s.found===n), dearest=full.length?Math.max(...full.map(s=>s.total)):0;
   let shownStores=showAllStores?res.stores:res.stores.slice(0,6);
   if(!showAllStores&&typeof selStore==='number'&&!shownStores.some(s=>s.si===selStore)) shownStores=[...shownStores,res.stores.find(s=>s.si===selStore)];
@@ -908,15 +918,17 @@ function runBasket(){
   // נבדקים: הסניפים המוצגים + הסניף שנבחר + הסניפים שבטבלה. "חסר" = לא נמכר, או שמוצגת חלופה / מוצר אחר במקום המקובע
   const careSt=[...new Set([...shownStores,...cmpSel.map(si=>res.stores.find(s=>s.si===si)).filter(Boolean)])];
   const miss=res.parsed.map((p,i)=>({p,i,where:careSt.filter(s=>!s.rows[i]||s.rows[i].alt||s.rows[i].fallback)})).filter(x=>x.where.length);
-  if(miss.length) h+=`<div class="missbox"><b>🧺 חסרים פריטים בחלק מהסניפים.</b> כדי להשוות את כולם על אותם פריטים, אפשר להוציא פריטים מההשוואה:
+  let missH='';
+  if(miss.length) missH=`<div class="missbox"><b>🧺 חסרים פריטים בחלק מהסניפים.</b> כדי להשוות את כולם על אותם פריטים, אפשר להוציא פריטים מההשוואה:
     ${miss.map(x=>`<div class="mrow"><div><b>${esc(splitLine(x.p.line).name)}</b><div class="sub">${(()=>{const no=x.where.filter(s=>!s.rows[x.i]), al=x.where.filter(s=>s.rows[x.i]);
       const nm=a=>a.slice(0,3).map(s=>esc(stTitle(s.si))).join(', ')+(a.length>3?` ועוד ${a.length-3}`:'');
       return [no.length?`חסר ב: ${nm(no)}`:'', al.length?`🔄 מוצר חלופי ב: ${nm(al)}`:''].filter(Boolean).join('<br>');})()}</div></div><button data-ex="${esc(keyOf(x.p.line))}">הוצאה</button></div>`).join('')}
     ${miss.length>1?`<button class="morebtn" id="exAll">הוצאת כל ${miss.length} הפריטים החסרים</button>`:''}</div>`;
-  h+=exH;
-  if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
+
   if(mixedTot<res.stores[0].total-0.5||selStore==='mix')
     h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="info">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · <span class="miss">חסרים ${n-mixedFound}</span>`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
+  if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
+  h+=missH+exH;
   const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
   const title=selStore==='mix'?'סל משולב':stFull(selStore);
   // ---- לוח מבצעים ----
@@ -981,6 +993,8 @@ function runBasket(){
     if(cmpSel.length>=2) setTimeout(()=>{const t=$('#ctabH');if(t)t.scrollIntoView({behavior:'smooth',block:'start'});},30);});
   const cc=$('#ctClear'); if(cc) cc.onclick=()=>{cmpSel=[];LS.set('cmpSel','[]');runBasket();};
   const mb=$('#moreStores'); if(mb) mb.onclick=()=>{showAllStores=!showAllStores;runBasket();};
+  const cn=document.querySelector('.cheapnote'); if(cn) cn.onclick=()=>{selStore=+cn.dataset.si;showAllStores=true;runBasket();
+    setTimeout(()=>{const el=document.querySelector(`.store[data-si="${cn.dataset.si}"]`);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},30);};
   bindExcl();
   const ea=$('#exAll'); if(ea) ea.onclick=()=>{miss.forEach(x=>excl.add(keyOf(x.p.line)));saveExcl();renderItems();runBasket();};
   // החלקה על פריט בפירוט: שמאלה +1, ימינה −1
@@ -1000,17 +1014,21 @@ function openPicker(i){
   const p=lastRes.parsed[i], key=keyOf(p.line);
   const si=selStore==='mix'?(lastRes.mixed[i]&&lastRes.mixed[i].si):selStore;   // הסניף שבו מחליפים
   const auto=Match.candidates(data.items,p.q);
-  let pool=auto.length?auto:Match.candidates(data.items,{...p.q,size:0});
+  const exact=auto.length?auto:Match.candidates(data.items,{...p.q,size:0});
+  // גם חלופות מתאימות (מותג אחר מאותו סוג – למשל מים אחרים במקום מי עדן)
+  const altSet=new Set(), alts=(p.altFn?p.altFn():[]).filter(it=>!exact.includes(it)); alts.forEach(it=>altSet.add(it[0]));
+  let pool=exact.concat(alts);
   const inStore=si!=null&&pool.some(it=>Match.priceIn(it,si)!=null);
   if(inStore) pool=pool.filter(it=>Match.priceIn(it,si)!=null);                 // רק מוצרים שנמכרים בסניף הזה
   const cheapest=it=>{if(inStore)return [si,Match.priceIn(it,si)];let b=null;for(const [s,pr] of it[3]) if(!b||pr<b[1]) b=[s,pr];return b;};
-  pool=pool.map(it=>({it,c:cheapest(it)})).sort((a,b)=>(Match.unitPrice(a.it,a.c[1])??a.c[1]*1000)-(Match.unitPrice(b.it,b.c[1])??b.c[1]*1000)).slice(0,40);
+  const up=x=>Match.unitPrice(x.it,x.c[1])??x.c[1]*1000;
+  pool=pool.map(it=>({it,c:cheapest(it),alt:altSet.has(it[0])})).sort((a,b)=>(a.alt-b.alt)||(up(a)-up(b))).slice(0,50);
   $('#psheet').innerHTML=`<div class="top"><b>${esc(p.line)}</b><button class="swap" id="pclose">סגירה</button></div>
     <label class="pinbox"><input type="checkbox" id="ppin" ${picks[key]?'checked':''}> 📌 לקבע את המוצר שאבחר – ייבחר תמיד גם בפעם הבאה, בלי קשר למחיר</label>
     <input id="psearch" type="search" placeholder="חיפוש מוצר אחר…" style="margin:10px 0">
     <div class="muted">${si!=null?`בלי סימון – ההחלפה רק ב<b>${esc(stTitle(si))}</b>. בשאר הסניפים יוצג הזול ביותר.`:''}</div>
     <div class="opt" data-b=""><b>אוטומטי</b><div class="sub">הכי זול שמתאים, בכל סניף בנפרד (מבטל קיבוע והחלפה)</div></div><div id="popts"></div>`;
-  const draw=list=>{$('#popts').innerHTML=list.map(({it,c})=>`<div class="opt" data-b="${esc(it[0])}"><div class="top"><div>${esc(it[1])}<div class="sub">${esc([sizeTxt(it),upTxt(it,c[1]),inStore?'מחיר בסניף הזה':'הכי זול ב'+stTitle(c[0])].filter(Boolean).join(' · '))}${pickOf(key,si)===it[0]?(picks[key]===it[0]?' · 📌 קבוע':' · נבחר'):''}</div></div><div class="p">${nis(c[1])}</div></div></div>`).join('')||'<div class="muted">אין תוצאות</div>';
+  const draw=list=>{let altHead=false;$('#popts').innerHTML=list.map(({it,c,alt})=>`${alt&&!altHead&&(altHead=true)?'<div class="phead">🔄 חלופות מתאימות (מותג או גודל אחר)</div>':''}<div class="opt" data-b="${esc(it[0])}"><div class="top"><div>${esc(it[1])}<div class="sub">${esc([sizeTxt(it),upTxt(it,c[1]),inStore?'מחיר בסניף הזה':'הכי זול ב'+stTitle(c[0])].filter(Boolean).join(' · '))}${pickOf(key,si)===it[0]?(picks[key]===it[0]?' · 📌 קבוע':' · נבחר'):''}</div></div><div class="p">${nis(c[1])}</div></div></div>`).join('')||'<div class="muted">אין תוצאות</div>';
     document.querySelectorAll('#picker .opt').forEach(o=>o.onclick=()=>{
       const b=o.dataset.b, pin=$('#ppin').checked;
       if(!b){delete picks[key];delete tmpPicks[key];}
