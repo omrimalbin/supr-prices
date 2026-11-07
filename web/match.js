@@ -37,7 +37,7 @@
   // התאמת מילה לשם מוצר (כל המילים, בכל סדר, כולל חלופות)
   function groupsOf(toks) { return toks.map(t => alts(t, toks)); }
   function wordIn(ws, g) { return ws.some(w => g.some(t => wordMatches(w, t) && !(NOT_FORM[t] || []).includes(w))); }
-  function matchAll(it, groups) { return groups.every(g => wordIn(it.words, g)); }
+  function matchAll(it, groups) { return groups.every(g => wordIn(it.aw || it.words, g)); }
   // מותגים -> סוג המוצר הכללי (לחיפוש חלופה כשהמותג לא נמכר בסניף)
   const BRAND_GENERIC = [
     [/ (?:מי )?(?:עדנ|נביעות|עינ גדי|מעיינות|אקווה נובה|סנ בנדטו|נרה) /, "מימ"],
@@ -128,7 +128,11 @@
   function prep(items) {           // מחשב פעם אחת מילים מנורמלות לכל מוצר
     if (!EXCL) EXCL = EXCLUDE.map(norm);
     let fresh = false;
-    for (const it of items) if (!it.words) { it.words = norm(it[1]).split(" "); fresh = true; }
+    for (const it of items) if (!it.words) {
+      it.words = norm(it[1]).split(" "); fresh = true;
+      // שמות של אותו מוצר ברשתות אחרות (נלמד מהנתונים): כל המילים שלהם + המילה הראשונה של כל שם
+      if (it[6]) { const vs = it[6].split(" | ").map(v => norm(v).split(" ")); it.aw = [...new Set(it.words.concat(...vs))]; it.heads = vs.map(v => v[0]); }
+    }
     if (fresh) packFixAll(items);
     return items;
   }
@@ -153,7 +157,7 @@
     // מעדיפים מוצרים ששמם מתחיל במילה הראשונה ("חלב 3%" ולא "קפה עם חלב")
     // (מדלגים על מילות פתיחה כלליות: "דגני בוקר קורנפלקס", "מארז במבה", "חלב טרי")
     const firstReal = ws => { let i = 0; while (i < ws.length - 1 && LEAD.has(ws[i])) i++; return ws[i]; };
-    const head = res.filter(it => groups[0].some(t => wordMatches(firstReal(it.words), t) || wordMatches(it.words[0], t)));
+    const head = res.filter(it => groups[0].some(t => wordMatches(firstReal(it.words), t) || wordMatches(it.words[0], t) || (it.heads || []).some(h => wordMatches(h, t))));
     if (head.length) res = head;
     // מוצרים שקילים (מחיר לק"ג): רק לירקות/פירות/בשר בסיסיים (שם קצר), או כשאין חלופה ארוזה
     if (res.some(it => it[5] !== "kg")) res = res.filter(it => it[5] !== "kg" || it.words.length <= 4);
@@ -275,6 +279,12 @@
       for (const it of p.cands) for (const w of norm(it[2] || "").split(" ")) if (w.length >= 2) brand.add(w);
       const drop = toks.filter((t, j) => j >= 1 && brand.has(t));
       if (drop.length) queries.push(toks.filter(t => !drop.includes(t)).join(" "));
+      // סוג המוצר שנלמד מהשמות ברשתות אחרות: "מי עדן" נקרא גם "מים מינרליים מי עדן" -> מחפשים "מים ..."
+      const heads = new Map();
+      for (const it of p.cands.slice(0, 6)) for (const h of (it.heads || [])) if (h && h.length >= 2 && !wordMatches(h, toks[0]) && !STOP.has(h)) heads.set(h, (heads.get(h) || 0) + 1);
+      for (const h of [...heads.keys()].sort((a, b) => heads.get(b) - heads.get(a)).slice(0, 2)) {
+        queries.push([h, ...toks.slice(1).filter(t => !brand.has(t))].join(" "), h);
+      }
       // שורה ארוכה (3+ מילים, למשל "זיתים ירוקים שלמים בטעם שום"): שתי המילים הראשונות – סוג המוצר ותיאור עיקרי
       if (toks.length >= 3) queries.push(toks.slice(0, 2).join(" "));
       for (const qt of queries) {
@@ -354,10 +364,10 @@
     const toks = norm(text).split(" ").filter(t => t && !STOP.has(t));
     if (!toks.length) return items.slice();
     const groups = groupsOf(toks);
-    const loose = g => it => it.words.some(w => g.some(t => t.length >= 3 && w.includes(t)));
-    const res = items.filter(it => groups.every(g => wordIn(it.words, g) || loose(g)(it) || (it[2] && norm(it[2]).includes(g[0]))));
+    const loose = g => it => (it.aw || it.words).some(w => g.some(t => t.length >= 3 && w.includes(t)));
+    const res = items.filter(it => groups.every(g => wordIn(it.aw || it.words, g) || loose(g)(it) || (it[2] && norm(it[2]).includes(g[0]))));
     // רלוונטיות: מילים שלמות לפני חלקי מילה, ושם שמתחיל במילה הראשונה – קודם
-    for (const it of res) it._rel = groups.reduce((a, g) => a + (wordIn(it.words, g) ? 2 : 0), 0)
+    for (const it of res) it._rel = groups.reduce((a, g) => a + (wordIn(it.words, g) ? 2 : wordIn(it.aw || it.words, g) ? 1 : 0), 0)
       + (g0 => g0.some(t => wordMatches(it.words[0], t)) ? 1 : 0)(groups[0]);
     return res.sort((a, b) => b._rel - a._rel);
   }

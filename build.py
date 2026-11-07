@@ -97,6 +97,28 @@ def size_info(r):
     return size, unit, 1 if size else 0
 
 
+def _words(n):
+    return [w for w in re.sub(r"[^\w%]+", " ", n or "").split() if not w.isdigit()]
+
+
+def aliases(main, names):
+    """שמות נוספים שמוסיפים מילים שאין בשם הראשי (בלי שמות קטועים שהם רק תחילית שלו)."""
+    have = set(_words(main))
+    out = []
+    for n in sorted(set(names), key=len, reverse=True):
+        n = re.sub(r"\s+", " ", n.replace("\u202b", "")).strip()
+        if not n or n == main or main.startswith(n):
+            continue
+        ws = _words(n)
+        new = [w for w in ws if len(w) >= 3 and w not in have and not any(h.startswith(w) for h in have)]
+        if new:
+            out.append(n)
+            have.update(ws)
+        if len(out) >= 3:
+            break
+    return " | ".join(out)
+
+
 def best_name(names):
     """השם הכי מלא מבין הרשתות (שופרסל, למשל, חותכת שמות ל-20 תווים)."""
     names = [re.sub(r"\s+", " ", n.replace("\u202b", "").replace("\u202a", "")).strip() for n in names if n and n.strip()]
@@ -223,6 +245,11 @@ def make_city(c, radius=0):
         nm = best_name(inf["names"])
         if nm:
             it[1] = nm
+        # שמות אחרים של אותו מוצר ברשתות אחרות ("משקה סויה" / "חלב סויה", "מי עדן" / "מים מינרליים מי עדן"):
+        # האפליקציה לומדת מהם מילים נרדפות וסוג מוצר – בלי רשימות ידניות
+        al = aliases(it[1], inf["names"])
+        if al:
+            it.append(al)
         ev, size, unit = inf["size"]
         if it[5] != "kg" and ev > 0:
             s2, u2, ev2 = size_info({"name": it[1]})
@@ -274,8 +301,9 @@ def merge(base, extra):
             continue
         cur = by_code.get(it[0])
         if cur is None:
-            cur = by_code[it[0]] = [it[0], it[1], it[2], [], it[4], it[5]]
+            cur = by_code[it[0]] = [it[0], it[1], it[2], [], it[4], it[5]] + (it[6:7])
         elif cur[5] != "kg":
+            names = {cur[1], it[1] or ""} | set(" | ".join(cur[6:7] + it[6:7]).split(" | "))
             # שם מלא יותר / מארז מפורש מהרשתות של המחשב בבית
             if len(it[1] or "") > len(cur[1] or ""):
                 cur[1] = it[1]
@@ -283,6 +311,10 @@ def merge(base, extra):
             best = max([a, b], key=lambda x: x[2])
             if best[0] and best[2] >= 1:
                 cur[4], cur[5] = best[0], best[1]
+            al = aliases(cur[1], {n for n in names if n})
+            del cur[6:]
+            if al:
+                cur.append(al)
             base["items"].append(cur)
         cur[3] += prices
         cur[3].sort(key=lambda x: x[1])
