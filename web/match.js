@@ -38,6 +38,11 @@
   function groupsOf(toks) { return toks.map(t => alts(t, toks)); }
   function wordIn(ws, g) { return ws.some(w => g.some(t => wordMatches(w, t) && !(NOT_FORM[t] || []).includes(w))); }
   function matchAll(it, groups) { return groups.every(g => wordIn(it.words, g)); }
+  // מותגים -> סוג המוצר הכללי (לחיפוש חלופה כשהמותג לא נמכר בסניף)
+  const BRAND_GENERIC = [
+    [/ (?:מי )?(?:עדנ|נביעות|עינ גדי|מעיינות|אקווה נובה|סנ בנדטו|נרה) /, "מימ"],
+    [/ (?:קוקה )?קולה|פפסי /, "קולה"],
+  ];
   const SUF = ["", "ה", "ת", "ות", "ימ", "י", "ית", "יות", "יימ", "ייה", "יה"];   // אחרי נרמול: ם -> מ
 
   const UNIT_RE = [
@@ -222,7 +227,31 @@
       if (l.qty) q.qty = Math.max(q.qty, l.qty);   // כמות שהוגדלה בעקבות מבצע
       return { ...l, q, cands: candidates(data.items, q), pinned: l.pick && byCode.get(l.pick), tmp: l.tmp || {} };
     });
-    const pick = (p, si) => bestPick(p, si);
+    // חלופה לסניף שלא מוכר את המוצר המבוקש: מותג -> סוג כללי (מי עדן -> מים), או בלי מילה (בדרך כלל המותג)
+    const altCands = p => {
+      if (p._alt) return p._alt;
+      const toks = norm(p.q.text).split(" ").filter(t => t && !STOP.has(t)), seen = new Set(p.cands.map(it => it[0])), out = [];
+      const queries = [];
+      const txt = " " + toks.join(" ") + " ";
+      for (const [re, gen] of BRAND_GENERIC) if (re.test(txt)) queries.push(txt.replace(re, " " + gen + " ").trim());
+      // מורידים רק מילים שהן שם יצרן/מותג (לפי שדה היצרן של המוצרים המתאימים) – לא "לבנה", "מתוקה", "סויה"
+      const brand = new Set();
+      for (const it of p.cands) for (const w of norm(it[2] || "").split(" ")) if (w.length >= 2) brand.add(w);
+      const drop = toks.filter((t, j) => j >= 1 && brand.has(t));
+      if (drop.length) queries.push(toks.filter(t => !drop.includes(t)).join(" "));
+      for (const qt of queries) {
+        for (const it of candidates(data.items, { ...p.q, text: qt })) if (!seen.has(it[0])) { seen.add(it[0]); out.push(it); }
+        if (out.length >= 40) break;
+      }
+      return (p._alt = out);
+    };
+    const pick = (p, si) => {
+      const b = bestPick(p, si);
+      if (b || p.tmp[si]) return b;
+      const a = bestIn(altCands(p), si, p.q.qty, deals, gramsOf(p));
+      if (a) { a.alt = true; delete a.offer; }
+      return a;
+    };
     const gramsOf = p => (p.q.unit === "g" ? p.q.size : 0);
     const bestPick = (p, si) => {
       const bestIn_ = (c, s, q, d) => bestIn(c, s, q, d, gramsOf(p));

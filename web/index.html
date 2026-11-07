@@ -140,6 +140,7 @@ details.txt{margin-top:8px}details.txt summary{color:var(--muted);font-size:14px
 .exchip a{color:var(--accent);font-weight:700;text-decoration:none}
 @media (prefers-color-scheme:dark){.missbox{background:#3a2e12;border-color:#c99a3a;color:#fbeecf}.missbox .sub{color:#e2cf9e}.missbox .mrow{border-top-color:#5c4a1c}
  .missbox .mrow button,.missbox .morebtn{background:#2a2108;color:#fbd98a;border-color:#c99a3a}}
+.altl{color:#b45309;font-weight:600}@media (prefers-color-scheme:dark){.altl{color:#f0b35a}}
 .exq{font-size:13px;font-weight:600;color:var(--err);margin-top:3px}.exq a{color:var(--accent)}
 
 #modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -895,7 +896,8 @@ function runBasket(){
   if(!showAllStores&&typeof selStore==='number'&&!shownStores.some(s=>s.si===selStore)) shownStores=[...shownStores,res.stores.find(s=>s.si===selStore)];
   h+=shownStores.map((s,i)=>{
     const promos=s.rows.filter(r=>r&&r.promo).length;
-    const info=[s.found===n?'כל הפריטים':`<span class="miss">חסרים ${n-s.found}</span>`,
+    const nAlt=s.rows.filter(r=>r&&(r.alt||r.fallback)).length;
+    const info=[s.found===n?'כל הפריטים':`<span class="miss">חסרים ${n-s.found}</span>`, nAlt?`🔄 ${nAlt} חלופות`:'',
       promos?`🏷️ ${promos} מבצעים`:'', s.offers?`❓ ${s.offers} לאישור`:'', staleTxt(s.si)].filter(Boolean).join(' · ');
     const save=i===0&&s.found===n&&dearest-s.total>0.5?`<div class="save">חוסך ${nis(dearest-s.total)} לעומת היקר</div>`:'';
     return `<div class="store ${s.si===selStore?'sel':''}" data-si="${s.si}"><div class="top"><div>
@@ -903,9 +905,13 @@ function runBasket(){
       <div class="loc">📍 ${esc(storeLabel(data.stores[s.si]).loc)}${data.stores[s.si]._me!=null&&locMode?` · ${data.stores[s.si]._me} ק"מ ממך`:''}</div>
       <div class="info">${info}</div>${save}<button class="ctog ${cmpSel.includes(s.si)?'on':''}" data-ct="${s.si}">${cmpSel.includes(s.si)?'☑ בטבלה':'☐ לטבלת השוואה'}</button></div><div class="tot">${nis(s.total)}</div></div></div>`;}).join('');
   // פריטים שחסרים בחלק מהסניפים – אפשר להוציא אותם, כדי שכל הסניפים יושוו על אותם פריטים
-  const miss=res.parsed.map((p,i)=>({p,i,where:shownStores.filter(s=>!s.rows[i])})).filter(x=>x.where.length);
+  // נבדקים: הסניפים המוצגים + הסניף שנבחר + הסניפים שבטבלה. "חסר" = לא נמכר, או שמוצגת חלופה / מוצר אחר במקום המקובע
+  const careSt=[...new Set([...shownStores,...cmpSel.map(si=>res.stores.find(s=>s.si===si)).filter(Boolean)])];
+  const miss=res.parsed.map((p,i)=>({p,i,where:careSt.filter(s=>!s.rows[i]||s.rows[i].alt||s.rows[i].fallback)})).filter(x=>x.where.length);
   if(miss.length) h+=`<div class="missbox"><b>🧺 חסרים פריטים בחלק מהסניפים.</b> כדי להשוות את כולם על אותם פריטים, אפשר להוציא פריטים מההשוואה:
-    ${miss.map(x=>`<div class="mrow"><div><b>${esc(splitLine(x.p.line).name)}</b><div class="sub">חסר ב: ${x.where.slice(0,3).map(s=>esc(stTitle(s.si))).join(', ')}${x.where.length>3?` ועוד ${x.where.length-3}`:''}</div></div><button data-ex="${esc(keyOf(x.p.line))}">הוצאה</button></div>`).join('')}
+    ${miss.map(x=>`<div class="mrow"><div><b>${esc(splitLine(x.p.line).name)}</b><div class="sub">${(()=>{const no=x.where.filter(s=>!s.rows[x.i]), al=x.where.filter(s=>s.rows[x.i]);
+      const nm=a=>a.slice(0,3).map(s=>esc(stTitle(s.si))).join(', ')+(a.length>3?` ועוד ${a.length-3}`:'');
+      return [no.length?`חסר ב: ${nm(no)}`:'', al.length?`🔄 מוצר חלופי ב: ${nm(al)}`:''].filter(Boolean).join('<br>');})()}</div></div><button data-ex="${esc(keyOf(x.p.line))}">הוצאה</button></div>`).join('')}
     ${miss.length>1?`<button class="morebtn" id="exAll">הוצאת כל ${miss.length} הפריטים החסרים</button>`:''}</div>`;
   h+=exH;
   if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
@@ -933,7 +939,7 @@ function runBasket(){
     const cs=cmpSel.map(si=>res.stores.find(s=>s.si===si)).sort((a,b)=>(b.found-a.found)||(a.total-b.total));
     h+=`<h3 id="ctabH">טבלת השוואה</h3><div class="ctabw"><table class="ctab"><thead><tr><th>מוצר</th>${cs.map(s=>`<th>${esc(stTitle(s.si))}<div class="loc">${esc(storeLabel(data.stores[s.si]).loc)}</div></th>`).join('')}</tr></thead><tbody>`;
     h+=res.parsed.map((p,i)=>{const rs=cs.map(s=>s.rows[i]); const ok=rs.filter(Boolean).map(r=>r.cost); const mn=ok.length>1?Math.min(...ok):null;
-      return `<tr><td class="cn">${esc(p.line)}</td>${rs.map(r=>r?`<td class="${mn!=null&&r.cost<=mn+0.005?'best':''}"><b>${nis(r.cost)}</b>${r.promo?' 🏷️':''}<div class="cp">${esc(r.it[1])}</div>${r.adjusted?`<div class="cp adjc">⚖️ מותאם · בפועל ${wTxt(r.actualG)} ב־${nis(r.actual)}</div>`:''}</td>`:'<td class="na">—<div class="cp">לא נמכר</div></td>').join('')}</tr>`;}).join('');
+      return `<tr><td class="cn">${esc(p.line)}</td>${rs.map(r=>r?`<td class="${mn!=null&&r.cost<=mn+0.005?'best':''}"><b>${nis(r.cost)}</b>${r.promo?' 🏷️':''}<div class="cp">${r.alt||r.fallback?'🔄 ':''}${esc(r.it[1])}</div>${r.adjusted?`<div class="cp adjc">⚖️ מותאם · בפועל ${wTxt(r.actualG)} ב־${nis(r.actual)}</div>`:''}</td>`:'<td class="na">—<div class="cp">לא נמכר</div></td>').join('')}</tr>`;}).join('');
     const tots=cs.map(s=>s.total), full=cs.map(s=>s.found===n), mt=Math.min(...tots.filter((t,j)=>full[j]).concat([Infinity]));
     h+=`</tbody><tfoot><tr><td>סה"כ</td>${cs.map((s,j)=>`<td class="${full[j]&&s.total<=mt+0.005?'best':''}"><b>${nis(s.total)}</b>${full[j]?'':`<div class="cp miss">חסרים ${n-s.found}</div>`}</td>`).join('')}</tr></tfoot></table></div>
       <button class="morebtn" id="ctClear">ניקוי הסימון</button>`;
@@ -961,7 +967,7 @@ function runBasket(){
       <div class="row"><button class="yes" data-yes="${i}">כן, להגדיל</button><button data-deal="${esc(Match.dealKey(o.it,o.offer))}" data-v="0">לא</button></div></div>`;}
     return `<div class="line" data-li="${i}"><div class="top"><div><div class="q">${esc(p.line)}</div>
       <div>${esc(it[1])}${r.weighed?` <span class="muted">· ${wTxt(Math.round(r.used*1000))}</span>`:r.packs?(!r.adjusted&&r.used>1?` <span class="muted">× ${r.used} אריזות</span>`:''):r.used!==1?` <span class="muted">× ${r.used}</span>`:''}</div>${r.weighed?wSel(i,p,true):it[5]==='g'&&it[4]>0?wSel(i,p,false):''}<div class="sub">${esc([sizeTxt(it),upTxt(it,(r.actual??r.cost)/r.used)].filter(Boolean).join(' · '))}</div>${adjNote(r,p)}${selStore==='mix'?`<div class="sub"><b>${esc(stTitle(r.si))}</b></div><div class="locline">📍 ${esc(storeLabel(data.stores[r.si]).loc)}</div>`:''}
-      ${promoLine}${r.manual?'<div class="lock">↔️ הוחלף ידנית בסניף הזה (בשאר הסניפים – הזול ביותר)</div>':r.fallback?`<div class="lock">ℹ️ המוצר הקבוע "${esc(itemName(picks[k])||'')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:r.pinned?'<div class="lock">📌 מוצר קבוע – מוצג בכל הסניפים, בלי קשר למחיר</div>':''}</div>
+      ${promoLine}${r.alt?`<div class="lock altl">🔄 חלופה: "${esc(splitLine(p.line).name)}" לא נמכר בסניף הזה – מוצג מוצר דומה</div>`:r.manual?'<div class="lock">↔️ הוחלף ידנית בסניף הזה (בשאר הסניפים – הזול ביותר)</div>':r.fallback?`<div class="lock">ℹ️ המוצר הקבוע "${esc(itemName(picks[k])||'')}" לא נמכר כאן – מוצג הזול ביותר בסניף</div>`:r.pinned?'<div class="lock">📌 מוצר קבוע – מוצג בכל הסניפים, בלי קשר למחיר</div>':''}</div>
       <div class="p">${nis(r.cost)}${r.promo&&regular>r.cost+0.005?`<div class="old">${nis(regular)}</div>`:''}</div></div>
       ${offer}<div class="acts"><button class="swap" data-i="${i}">החלפה</button>${pinned
         ?`<button class="swap pinon" data-unpin="${esc(k)}">📌 קבוע · ביטול</button>`
