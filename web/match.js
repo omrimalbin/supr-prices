@@ -239,6 +239,8 @@
       for (const it of p.cands) for (const w of norm(it[2] || "").split(" ")) if (w.length >= 2) brand.add(w);
       const drop = toks.filter((t, j) => j >= 1 && brand.has(t));
       if (drop.length) queries.push(toks.filter(t => !drop.includes(t)).join(" "));
+      // שורה ארוכה (3+ מילים, למשל "זיתים ירוקים שלמים בטעם שום"): שתי המילים הראשונות – סוג המוצר ותיאור עיקרי
+      if (toks.length >= 3) queries.push(toks.slice(0, 2).join(" "));
       for (const qt of queries) {
         for (const it of candidates(data.items, { ...p.q, text: qt })) if (!seen.has(it[0])) { seen.add(it[0]); out.push(it); }
         if (out.length >= 40) break;

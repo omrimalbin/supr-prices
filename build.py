@@ -69,6 +69,38 @@ def parse_size(r):
     return 0, ""
 
 
+# מילים שמסמנות מארז של כמה יחידות (שם בלי "6*750")
+_PACK_WORDS = [(r"שישי(?:י)?(?:ה|ת)", 6), (r"רביעי(?:י)?(?:ה|ת)", 4), (r"שלישי(?:י)?(?:ה|ת)", 3),
+               (r"תריסר", 12), (r"זוג(?:ות)?", 2)]
+
+
+def size_info(r):
+    """גודל + כמה אמינים הנתונים: 2 = מארז מפורש (6*750 / שישייה + גודל), 1 = גודל מהשם, 0 = מהשדות/כלום."""
+    size, unit = parse_size(r)
+    if unit == "kg":
+        return size, unit, 1
+    name = (r.get("name") or "").replace("׳", "'").replace("״", '"')
+    if re.search(r"\d+\s*[*xX×]\s*\d", name) and size:
+        return size, unit, 2
+    n = 0
+    for pat, cnt in _PACK_WORDS:
+        if re.search(pat, name):
+            n = cnt
+            break
+    m = re.search(r"מארז\s*(?:של\s*)?(\d{1,2})(?!\d)", name) or re.search(r"(\d{1,2})\s*(?:יח'|יחידות|יח)(?![א-ת])", name)
+    if not n and m and unit and unit != "u":
+        n = int(m.group(1))
+    if n > 1 and size and unit in ("g", "ml"):
+        return size * n, unit, 2
+    return size, unit, 1 if size else 0
+
+
+def best_name(names):
+    """השם הכי מלא מבין הרשתות (שופרסל, למשל, חותכת שמות ל-20 תווים)."""
+    names = [re.sub(r"\s+", " ", n.replace("\u202b", "").replace("\u202a", "")).strip() for n in names if n and n.strip()]
+    return max(names, key=lambda n: (len(n), n)) if names else ""
+
+
 def slug(city):
     return hashlib.md5(city.encode("utf-8")).hexdigest()[:10]
 
@@ -123,7 +155,7 @@ def make_city(c, radius=0):
     A.fetch_city(c, stores=area)
     d = A.city_data(c, area)
     now = round(time.time())
-    stores, idx, items = [], {}, {}
+    stores, idx, items, info = [], {}, {}, {}
     promo_by_store, descs, desc_idx = {}, [], {}
     npromo = 0
     for st in area:
@@ -147,13 +179,19 @@ def make_city(c, radius=0):
             addr = re.sub(r",?\s*Israel\s*$", "", (so.get("address") or "").strip(), flags=re.I)
             stores.append([r["chain"], r["sname"] or "סניף " + r["store"], now, dist.get(k, 0),
                            addr, geo.store_city(so) if so else ""])
-        size, unit = parse_size(r)
+        size, unit, ev = size_info(r)
         ik = item_key(r, unit)
         it = items.get(ik)
         if it is None:
             it = items[ik] = [ik, r["name"], r["manu"], [], size, unit]
-        if not it[1]:
-            it[1] = r["name"]
+            info[ik] = {"names": set(), "size": (ev, size, unit)}
+        inf = info[ik]
+        if r["name"]:
+            inf["names"].add(r["name"])
+        if not it[2] and r["manu"]:
+            it[2] = r["manu"]
+        if ev > inf["size"][0]:
+            inf["size"] = (ev, size, unit)
         dup = next((x for x in it[3] if x[0] == idx[k]), None)
         if dup is not None:                   # אותו מוצר פנימי פעמיים באותו סניף – נשאר הזול
             if pr >= dup[1]:
@@ -177,6 +215,16 @@ def make_city(c, radius=0):
             pe.append(sorted(offers.values())[:3])
             npromo += 1
         it[3].append(pe)
+    # שם מלא מכל הרשתות + גודל מהמקור הכי אמין (מארז מפורש > גודל מהשם > שדות)
+    for ik, it in items.items():
+        inf = info[ik]
+        nm = best_name(inf["names"])
+        if nm:
+            it[1] = nm
+        ev, size, unit = inf["size"]
+        if it[5] != "kg" and ev > 0:
+            s2, u2, ev2 = size_info({"name": it[1]})
+            it[4], it[5] = (s2, u2) if ev2 >= ev and s2 else (size, unit)
     return {"stores": stores, "items": list(items.values()), "promos": descs,
             "n_city_stores": len(area), "n_promo": npromo}
 
@@ -225,6 +273,14 @@ def merge(base, extra):
         cur = by_code.get(it[0])
         if cur is None:
             cur = by_code[it[0]] = [it[0], it[1], it[2], [], it[4], it[5]]
+        elif cur[5] != "kg":
+            # שם מלא יותר / מארז מפורש מהרשתות של המחשב בבית
+            if len(it[1] or "") > len(cur[1] or ""):
+                cur[1] = it[1]
+            a, b = size_info({"name": cur[1]}), size_info({"name": it[1] or ""})
+            best = max([a, b], key=lambda x: x[2])
+            if best[0] and best[2] >= 1:
+                cur[4], cur[5] = best[0], best[1]
             base["items"].append(cur)
         cur[3] += prices
         cur[3].sort(key=lambda x: x[1])
