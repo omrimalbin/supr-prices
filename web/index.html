@@ -845,7 +845,14 @@ function setWeight(i,g){const ls=lines(); if(!ls[i])return; const {name,qty}=spl
 const wkCache=new Map(); let wkData=null;
 function weightKind(l){
   if(!data) return ''; if(wkData!==data){wkCache.clear();wkData=data;Match.prep(data.items);}
-  const q=Match.parseLine(l); if(wkCache.has(q.text)) return wkCache.get(q.text);
+  const q=Match.parseLine(l), k0=keyOf(l);
+  // המוצר שנבחר בפועל קובע: מקובע / הוחלף / נבחר בסניף שבהשוואה – אם הוא נמכר במשקל (למשל גבינה מהמעדנייה)
+  const pc=picks[k0]||(selStore!=null&&tmpPicks[k0]&&tmpPicks[k0][selStore]); const pit=pc&&(itemName(pc),data._byCode.get(pc));
+  if(pit) return pit[5]==='kg'?'kg':'';
+  if(lastRes&&typeof selStore==='number'){ const i=lastRes.parsed.findIndex(p=>p.line===l), st=lastRes.stores.find(s=>s.si===selStore), r=i>=0&&st&&st.rows[i];
+    if(r&&r.weighed) return 'kg'; }
+  if(/במשקל|מעדני/.test(l)) return 'kg';
+  if(wkCache.has(q.text)) return wkCache.get(q.text);
   const c=Match.candidates(data.items,{...q,size:0,unit:''}); let kg=0,g=0,o=0;
   for(const it of c){if(it[5]==='kg')kg++;else if(it[5]==='g')g++;else if(it[4]>0)o++;}
   const k=!c.length?'':kg&&kg>=(g+o)*0.25?'kg':o>kg+g?'':'g'; wkCache.set(q.text,k); return k;}
@@ -903,7 +910,7 @@ function runBasket(){
       h+=`<div class="cheapnote" data-si="${c0.si}">💡 ${cheaper.length===1?'יש סניף זול יותר':`יש ${cheaper.length} סניפים זולים יותר`} שחסרים בו פריטים: <b>${esc(stTitle(c0.si))}</b> – ${nis(cheaper[0].mine)} לעומת ${nis(cheaper[0].ref)} ב${esc(stTitle(best.si))} על אותם פריטים. חסר שם: ${esc(mi.slice(0,3).join(', '))}${mi.length>3?` ועוד ${mi.length-3}`:''}.
         <div class="sub">אפשר להוציא את הפריטים החסרים מההשוואה (למטה), או ללחוץ כאן כדי לראות את הסניף.</div></div>`; } }
   const full=res.stores.filter(s=>s.found===n), dearest=full.length?Math.max(...full.map(s=>s.total)):0;
-  let shownStores=showAllStores?res.stores:res.stores.slice(0,6);
+  let shownStores=showAllStores?res.stores:res.stores.slice(0,5);
   if(!showAllStores&&typeof selStore==='number'&&!shownStores.some(s=>s.si===selStore)) shownStores=[...shownStores,res.stores.find(s=>s.si===selStore)];
   h+=shownStores.map((s,i)=>{
     const promos=s.rows.filter(r=>r&&r.promo).length;
@@ -928,7 +935,7 @@ function runBasket(){
 
   if(mixedTot<res.stores[0].total-0.5||selStore==='mix')
     h+=`<div class="store ${selStore==='mix'?'sel':''}" data-si="mix"><div class="top"><div><b>סל משולב</b><div class="info">כל פריט מהסניף הכי זול בשבילו${mixedFound<n?` · <span class="miss">חסרים ${n-mixedFound}</span>`:''}</div></div><div class="tot">${nis(mixedTot)}</div></div></div>`;
-  if(res.stores.length>6) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 6 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
+  if(res.stores.length>5) h+=`<button class="morebtn" id="moreStores">${showAllStores?'הצגת 5 הזולים בלבד':`הצגת כל הסניפים (${res.stores.length})`}</button>`;
   h+=missH+exH;
   const rows=selStore==='mix'?res.mixed:res.stores.find(s=>s.si===selStore).rows;
   const title=selStore==='mix'?'סל משולב':stFull(selStore);
